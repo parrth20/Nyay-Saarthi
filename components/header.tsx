@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Scale, MessageSquare, BarChart3, Phone, User, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { getCurrentUser, logout, type User as UserType } from "@/lib/auth"
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,12 +13,32 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { getCurrentUser } from "@/actions/auth"
+import { createClient } from "@/utils/supabase/client"
+import { set } from "date-fns"
+
+
+// Define UserType according to your user object structure
+type User = {
+  id: string
+  email?: string
+  user_metadata?: {
+    name?: string
+    username?: string
+    [key: string]: any
+  }
+}
+
 
 export function Header() {
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
-  const [user, setUser] = useState<UserType | null>(null)
+  const [user, setUser] = useState<User| null>(null)
   const router = useRouter()
+  const [userData,setUserData]=useState<any>(null)
+ 
+  
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,9 +49,20 @@ export function Header() {
   }, [])
 
   useEffect(() => {
-    const checkUser = () => {
-      const currentUser = getCurrentUser()
-      setUser(currentUser)
+    const checkUser = async () => {
+      const supabase = createClient()
+      const {data,error} = await supabase.auth.getUser()
+      if(error || !data.user) {
+        console.log("Error fetching user:", error)
+      }else{
+        
+        setUser(data.user)
+        
+      }
+
+      // const currentUser = getCurrentUser()
+      // console.log("Current User:", currentUser)
+      // setUser(currentUser)
     }
 
     checkUser()
@@ -46,10 +77,11 @@ export function Header() {
   }, [])
 
   const handleLogout = () => {
-    logout()
+    // logout()
     setUser(null)
     router.push("/")
   }
+  
 
   return (
     <header
@@ -103,9 +135,10 @@ export function Header() {
                   <Button
                     variant="outline"
                     className="border-green-600 text-green-600 hover:bg-green-50 bg-transparent"
+                    onClick={() => console.log(user)}
                   >
                     <User className="h-4 w-4 mr-2" />
-                    {user.name}
+                    {user?.user_metadata?.name || "प्रोफ़ाइल"} 
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -189,14 +222,14 @@ export function Header() {
               <div className="flex flex-col space-y-2 pt-4">
                 {user ? (
                   <>
-                    <div className="text-sm text-gray-600 py-2 border-b border-gray-200">स्वागत, {user.name}</div>
+                    <div className="text-sm text-gray-600 py-2 border-b border-gray-200">स्वागत, {user?.user_metadata?.name || "प्रोफ़ाइल"} </div>
                     <Link href="/profile">
                       <Button
                         variant="outline"
                         className="w-full border-green-600 text-green-600 hover:bg-green-50 bg-transparent"
                       >
                         <User className="h-4 w-4 mr-2" />
-                        प्रोफाइल
+                         {user?.user_metadata?.name || "प्रोफ़ाइल"} 
                       </Button>
                     </Link>
                     <Button
