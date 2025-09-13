@@ -10,8 +10,11 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, CheckCircle } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { singUp } from "@/actions/auth"
 
 export default function RegisterPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState({
@@ -28,9 +31,13 @@ export default function RegisterPage() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     // Handle registration logic here
+    const formdata=new FormData(e.currentTarget as HTMLFormElement)
+    const result=await singUp(formdata);
+    if(result.status==="success") router.push('/login')
+    else alert(result.message)
     console.log("Registration attempt:", formData)
   }
 
@@ -89,6 +96,7 @@ export default function RegisterPage() {
                     <Input
                       id="name"
                       type="text"
+                      name="name"
                       placeholder="आपका पूरा नाम"
                       value={formData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
@@ -105,6 +113,7 @@ export default function RegisterPage() {
                     <Input
                       id="email"
                       type="email"
+                      name="email"
                       placeholder="आपका ईमेल पता"
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
@@ -121,6 +130,7 @@ export default function RegisterPage() {
                     <Input
                       id="phone"
                       type="tel"
+                      name="phone"
                       placeholder="आपका मोबाइल नंबर"
                       value={formData.phone}
                       onChange={(e) => handleInputChange("phone", e.target.value)}
@@ -137,6 +147,7 @@ export default function RegisterPage() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
+                      name="password"
                       placeholder="एक मजबूत पासवर्ड बनाएं"
                       value={formData.password}
                       onChange={(e) => handleInputChange("password", e.target.value)}
@@ -159,6 +170,7 @@ export default function RegisterPage() {
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
                       id="confirmPassword"
+                      name="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder="पासवर्ड दोबारा दर्ज करें"
                       value={formData.confirmPassword}
