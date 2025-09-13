@@ -12,8 +12,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Shield, Users, FileText } from "lucide-react"
 import Link from "next/link"
 import { login } from "@/lib/auth"
+import { singIn } from "@/actions/auth"
+
 
 export default function LoginPage() {
+  
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -28,16 +31,15 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    setError("")
+    setError("");
+    const formdata=new FormData(e.currentTarget as HTMLFormElement)
+    const result=await singIn(formdata);
+    if(result.status==="success") router.push('/')
+    else setError(result.message)
 
-    try {
-      await login(email, password)
-      router.push(redirectTo)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "लॉगिन में त्रुटि हुई")
-    } finally {
-      setIsLoading(false)
-    }
+    setIsLoading(false)
+    
+        
   }
 
   return (
@@ -69,6 +71,7 @@ export default function LoginPage() {
                     <Input
                       id="email"
                       type="email"
+                      name="email"
                       placeholder="आपका ईमेल दर्ज करें"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -87,6 +90,7 @@ export default function LoginPage() {
                       id="password"
                       type={showPassword ? "text" : "password"}
                       placeholder="आपका पासवर्ड दर्ज करें"
+                      name="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
