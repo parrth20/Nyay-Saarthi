@@ -39,19 +39,17 @@ vectorstore = None
 class Query(BaseModel):
     question: str
 
+
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     global vectorstore
     
-    # --- MODIFICATION START: Process file in memory ---
-    # Instead of saving to disk, read the file content into a bytes buffer.
     file_content = await file.read()
     file_buffer = io.BytesIO(file_content)
-    file_buffer.name = file.filename  # Unstructured needs a file name
+    file_buffer.name = file.filename
     
-    # Load the document directly from the in-memory buffer
-    # NOTE: The loader might need just the buffer. If this fails, try loader(file=file_buffer)
-    loader = UnstructuredFileLoader(file_path=file_buffer.name, file=file_buffer, languages=["hin", "eng"])
+    # FIX: Remove the redundant file_path argument. The loader only needs the file buffer.
+    loader = UnstructuredFileLoader(file=file_buffer, languages=["hin", "eng"])
     # --- MODIFICATION END ---
     
     documents = loader.load()
