@@ -49,7 +49,7 @@ async def upload_file(file: UploadFile = File(...)):
     file_buffer.name = file.filename
     
     # FIX: Remove the redundant file_path argument. The loader only needs the file buffer.
-    loader = UnstructuredFileLoader(file=file_buffer, languages=["hin", "eng"])
+    loader = UnstructuredFileLoader(file_buffer, languages=["hin", "eng"])
     # --- MODIFICATION END ---
     
     documents = loader.load()
