@@ -45,7 +45,7 @@ export default function UploadPage() {
       formData.append("file", file)
 
       try {
-        const response = await fetch("https://nyay-saarthi-backend-b3k7.onrender.com", {
+        const response = await fetch("https://nyay-saarthi-backend-b3k7.onrender.com/upload", {
           method: "POST",
           body: formData,
         })
