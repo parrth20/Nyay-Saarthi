@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+python-multipart
+langchain
+langchain-community
+unstructured[pdf,easyocr] # <-- Update this line
+qdrant-client
+pytesseract
+pdf2image
+python-dotenv
+google-generativeai
+langchain-google-genai
+sentence-transformers # <-- Add this for local embeddings
+torch # <-- Add this (required by sentence-transformers)

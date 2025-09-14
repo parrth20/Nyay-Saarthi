@@ -14,6 +14,7 @@ interface Message {
   sender: "user" | "ai"
   timestamp: Date
   type?: "text" | "suggestion" | "document-analysis"
+  sources?: { content: string; page: number }[]
 }
 
 export default function ChatPage() {
@@ -55,36 +56,38 @@ export default function ChatPage() {
     setInputMessage("")
     setIsTyping(true)
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const response = await fetch("http://localhost:8000/ask/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question: inputMessage }),
+      })
+
+      const data = await response.json()
+
       const aiResponse: Message = {
         id: messages.length + 2,
-        content: getAIResponse(inputMessage),
+        content: data.answer,
+        sender: "ai",
+        timestamp: new Date(),
+        type: "text",
+        sources: data.sources,
+      }
+      setMessages((prev) => [...prev, aiResponse])
+    } catch (error) {
+      const errorResponse: Message = {
+        id: messages.length + 2,
+        content: "Sorry, I encountered an error. Please try again.",
         sender: "ai",
         timestamp: new Date(),
         type: "text",
       }
-      setMessages((prev) => [...prev, aiResponse])
+      setMessages((prev) => [...prev, errorResponse])
+    } finally {
       setIsTyping(false)
-    }, 1500)
-  }
-
-  const getAIResponse = (question: string): string => {
-    const responses = {
-      "मुख्य जोखिम":
-        "आपके सेवा समझौते में मुख्य जोखिम यह है कि रद्दीकरण की नीति स्पष्ट नहीं है। यदि आप सेवा रद्द करना चाहते हैं, तो आपको 30 दिन का नोटिस देना होगा।",
-      "समय सीमा":
-        "आपके दस्तावेज़ के अनुसार, भुगतान की समय सीमा 15 दिन है। यदि आप इस समय सीमा का पालन नहीं करते हैं, तो 2% प्रति माह का जुर्माना लगेगा।",
-      भुगतान: "भुगतान की शर्तें: मासिक आधार पर ₹5,000, 15 दिन के भीतर भुगतान करना आवश्यक है। देर से भुगतान पर 2% मासिक जुर्माना।",
     }
-
-    for (const [key, response] of Object.entries(responses)) {
-      if (question.toLowerCase().includes(key.toLowerCase())) {
-        return response
-      }
-    }
-
-    return "मैं आपके प्रश्न को समझने की कोशिश कर रहा हूँ। कृपया अधिक विशिष्ट जानकारी दें या अपने दस्तावेज़ के बारे में पूछें।"
   }
 
   const handleSuggestedQuestion = (question: string) => {
@@ -141,6 +144,18 @@ export default function ChatPage() {
                     }`}
                   >
                     <p className="text-sm">{message.content}</p>
+                    {message.sources && (
+                      <div className="mt-4">
+                        <h4 className="font-bold">Sources:</h4>
+                        {message.sources.map((source, index) => (
+                          <div key={index} className="mt-2 p-2 bg-gray-100 rounded">
+                            <p className="text-xs text-gray-700">
+                              {source.content} (Page: {source.page})
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <p className={`text-xs mt-2 ${message.sender === "user" ? "text-blue-100" : "text-gray-500"}`}>
                       {formatTime(message.timestamp)}
                     </p>
