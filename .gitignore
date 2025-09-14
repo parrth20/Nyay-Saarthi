@@ -25,3 +25,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Frontend (Next.js)
+Nyay-Saarthi/node_modules
+Nyay-Saarthi/.next
+Nyay-Saarthi/out
+Nyay-Saarthi/.env*.local
+
+# Backend (Python)
+Backend/__pycache__/
+Backend/venv/
+Backend/.venv/
+Backend/temp_*
+Backend/.env
+
+# macOS
+.DS_Store

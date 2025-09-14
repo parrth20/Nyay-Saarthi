@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useCallback } from "react"
+import { useRouter } from "next/navigation" // NEW: Import the router
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -19,64 +20,17 @@ interface UploadedFile {
 export default function UploadPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
+  const router = useRouter() // NEW: Initialize the router
 
-  const validateFile = (file: File): string | null => {
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    const allowedTypes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
-    ]
-
-    if (file.size > maxSize) {
-      return "फाइल का साइज़ 10MB से अधिक है"
-    }
-
-    if (!allowedTypes.includes(file.type)) {
-      return "केवल PDF, DOCX, या TXT फाइलें स्वीकार की जाती हैं"
-    }
-
-    return null
+  // NEW: Function to handle clicking the "View Result" button
+  const handleViewResult = () => {
+    router.push("/chat")
   }
 
-  const processFile = (fileId: string) => {
-    const interval = setInterval(() => {
-      setUploadedFiles((prev) =>
-        prev.map((f) => {
-          if (f.id === fileId) {
-            if (f.progress >= 100) {
-              clearInterval(interval)
-              return { ...f, status: "processing" }
-            }
-            return { ...f, progress: f.progress + 10 }
-          }
-          return f
-        }),
-      )
-    }, 200)
-
-    // Simulate processing completion
-    setTimeout(() => {
-      setUploadedFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileId
-            ? { ...f, status: "complete", result: "आपका दस्तावेज़ सफलतापूर्वक सरल भाषा में बदल दिया गया है।" }
-            : f,
-        ),
-      )
-    }, 3000)
-  }
-
-  const handleFileUpload = useCallback((files: FileList | File[]) => {
+  const handleFileUpload = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
 
-    fileArray.forEach((file) => {
-      const error = validateFile(file)
-      if (error) {
-        alert(error)
-        return
-      }
-
+    for (const file of fileArray) {
       const fileId = Math.random().toString(36).substr(2, 9)
       const newFile: UploadedFile = {
         file,
@@ -86,8 +40,35 @@ export default function UploadPage() {
       }
 
       setUploadedFiles((prev) => [...prev, newFile])
-      processFile(fileId)
-    })
+
+      const formData = new FormData()
+      formData.append("file", file)
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/upload/", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (response.ok) {
+          setUploadedFiles((prev) =>
+            prev.map((f) =>
+              f.id === fileId
+                ? { ...f, status: "complete", result: "File processed successfully" }
+                : f
+            )
+          )
+        } else {
+          setUploadedFiles((prev) =>
+            prev.map((f) => (f.id === fileId ? { ...f, status: "error" } : f))
+          )
+        }
+      } catch (error) {
+        setUploadedFiles((prev) =>
+          prev.map((f) => (f.id === fileId ? { ...f, status: "error" } : f))
+        )
+      }
+    }
   }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -104,7 +85,6 @@ export default function UploadPage() {
     (e: React.DragEvent) => {
       e.preventDefault()
       setIsDragOver(false)
-
       const files = e.dataTransfer.files
       if (files.length > 0) {
         handleFileUpload(files)
@@ -149,7 +129,7 @@ export default function UploadPage() {
                 type="file"
                 id="file-upload"
                 className="hidden"
-                accept=".pdf,.docx,.txt"
+                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg" // added photo functionality by OCR model Optical Character Recognition
                 multiple
                 onChange={handleFileInputChange}
               />
@@ -192,13 +172,13 @@ export default function UploadPage() {
                   </div>
 
                   {uploadedFile.status === "uploading" && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>अपलोड हो रहा है...</span>
-                        <span>{uploadedFile.progress}%</span>
-                      </div>
-                      <Progress value={uploadedFile.progress} className="h-2" />
-                    </div>
+                     <div className="space-y-2">
+                       <div className="flex justify-between text-sm">
+                         <span>अपलोड हो रहा है...</span>
+                         <span suppressHydrationWarning>{uploadedFile.progress}%</span>
+                       </div>
+                       <Progress value={uploadedFile.progress} className="h-2" />
+                     </div>
                   )}
 
                   {uploadedFile.status === "processing" && (
@@ -216,7 +196,10 @@ export default function UploadPage() {
                       </div>
                       <p className="text-sm text-muted-foreground">{uploadedFile.result}</p>
                       <div className="flex gap-2">
-                        <Button size="sm">परिणाम देखें</Button>
+                        {/* NEW: Added onClick handler */}
+                        <Button size="sm" onClick={handleViewResult}>
+                          परिणाम देखें
+                        </Button>
                         <Button variant="outline" size="sm">
                           डाउनलोड करें
                         </Button>
