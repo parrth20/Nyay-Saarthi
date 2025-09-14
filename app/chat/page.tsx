@@ -57,7 +57,7 @@ export default function ChatPage() {
     setIsTyping(true)
 
     try {
-      const response = await fetch("http://localhost:8000/ask/", {
+      const response = await fetch("https://nyay-saarthi-backend-b3k7.onrender.com/ask/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
