@@ -5,10 +5,12 @@ FROM python:3.11-slim
 WORKDIR /code
 
 # Install system dependencies needed for OCR and PDF processing
+# ADDITION: Added libgl1-mesa-glx for robustness with graphics-dependent libraries
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-hin \
     poppler-utils \
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container
