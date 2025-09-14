@@ -1,15 +1,16 @@
 import os
 import shutil
-import io  # <-- Add this import
+import io
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
+from unstructured.partition.auto import partition  # <-- This is the key change
+from unstructured.documents.elements import Element
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import UnstructuredFileLoader
+from langchain.docstore.document import Document
 from langchain_community.vectorstores import Qdrant
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -18,12 +19,11 @@ load_dotenv()
 
 app = FastAPI()
 
-# Your origins list. It's a good practice to add trailing slashes.
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://nyay-saarthi-sable.vercel.app",
-    "https://nyay-saarthi-sable.vercel.app/", # Add this line
+    "https://nyay-saarthi-sable.vercel.app/",
 ]
 
 app.add_middleware(
@@ -39,21 +39,19 @@ vectorstore = None
 class Query(BaseModel):
     question: str
 
-
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     global vectorstore
     
     file_content = await file.read()
     file_buffer = io.BytesIO(file_content)
-    file_buffer.name = file.filename
     
-    # FIX: Remove the redundant file_path argument. The loader only needs the file buffer.
-    loader = UnstructuredFileLoader(file_buffer, languages=["hin", "eng"])
-    # --- MODIFICATION END ---
+    # Corrected method to handle in-memory file by calling partition directly
+    elements = partition(file=file_buffer, filename=file.filename, languages=["hin", "eng"])
     
-    documents = loader.load()
-    
+    # Convert elements to LangChain Document objects
+    documents = [Document(page_content=str(el)) for el in elements]
+
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     texts = text_splitter.split_documents(documents)
     
@@ -111,7 +109,6 @@ async def ask_question(query: Query):
 
 @app.get("/verify/")
 async def verify_document():
-    # This is a placeholder for the verification feature
     return {
         "report": {
             "missing_signatures": ["Placeholder: Signature not found for Jane Doe"],
