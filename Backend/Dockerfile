@@ -4,11 +4,12 @@ FROM python:3.11-slim
 # Set the working directory in the container
 WORKDIR /code
 
-# Install system dependencies needed for OCR and PDF processing
+# Install system dependencies needed for OCR, PDF processing, AND OpenCV
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-hin \
     poppler-utils \
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container
