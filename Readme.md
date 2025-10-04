@@ -94,6 +94,6 @@ docker run -p 8000:8000 nyay-saarthi-backend
 ## 🤝 Contributing
 
 Contributions are welcome!  
-Please feel free to open an issue or submit a pull request..
+Please feel free to open an issue or submit a pull request.
 
 ---
