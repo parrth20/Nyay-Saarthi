@@ -9,15 +9,15 @@ from langchain_community.vectorstores import Qdrant
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import RetrievalQA
-# --- NEW: Import PromptTemplate ---
 from langchain.prompts import PromptTemplate
 import shutil
 
+# Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
-# CORS Middleware
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,27 +26,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global vectorstore
 vectorstore = None
 
 class Query(BaseModel):
     question: str
 
+
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
+    """
+    Upload and process the document into a vector database (Qdrant in-memory)
+    """
     global vectorstore
     
     file_location = f"temp_{file.filename}"
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
 
+    # Load document
     loader = UnstructuredFileLoader(file_location, languages=["hin", "eng"])
     documents = loader.load()
     
+    # Split text into chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     texts = text_splitter.split_documents(documents)
     
+    # Create embeddings
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
+    # Store in Qdrant (in memory)
     vectorstore = Qdrant.from_documents(
         texts,
         embeddings,
@@ -58,13 +67,17 @@ async def upload_file(file: UploadFile = File(...)):
     
     return {"message": "File uploaded and processed successfully"}
 
+
 @app.post("/ask/")
 async def ask_question(query: Query):
+    """
+    Ask questions to the uploaded document using Gemini model (Hindi-friendly)
+    """
     global vectorstore
     if not vectorstore:
         return {"error": "Please upload a document first"}
             
-    # --- MODIFICATION START: Create a custom prompt for Hindi ---
+    # Hindi prompt
     prompt_template = """
     दिए गए संदर्भ का उपयोग करके निम्नलिखित प्रश्न का उत्तर सरल हिंदी में दें।
     यदि आप उत्तर नहीं जानते हैं, तो बस कहें कि आप नहीं जानते, उत्तर बनाने की कोशिश न करें।
@@ -77,20 +90,23 @@ async def ask_question(query: Query):
     """
     
     PROMPT = PromptTemplate(
-        template=prompt_template, input_variables=["context", "question"]
+        template=prompt_template,
+        input_variables=["context", "question"]
     )
     
     chain_type_kwargs = {"prompt": PROMPT}
-    # --- MODIFICATION END ---
     
+    # ✅ Use correct model call (no 'models/' prefix)
     qa = RetrievalQA.from_chain_type(
-        llm=ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0),
+        llm=ChatGoogleGenerativeAI(
+            model="gemini-flash-latest",
+            temperature=0,
+            google_api_key=os.getenv("GOOGLE_API_KEY")  # ensure it's loaded
+        ),
         chain_type="stuff",
         retriever=vectorstore.as_retriever(),
         return_source_documents=True,
-        # --- MODIFICATION START: Add the custom prompt to the chain ---
         chain_type_kwargs=chain_type_kwargs
-        # --- MODIFICATION END ---
     )
     
     result = qa.invoke({"query": query.question})
@@ -103,16 +119,20 @@ async def ask_question(query: Query):
         ],
     }
 
+
 @app.get("/verify/")
 async def verify_document():
-    # This is a placeholder for the verification feature
+    """
+    Dummy verification route for placeholder report
+    """
     return {
         "report": {
-            "missing_signatures": ["Placeholder: Signature not found for Jane Doe"],
-            "inconsistent_dates": ["Placeholder: The end date is before the start date."],
-            "clause_mismatches": ["Placeholder: The liability clause seems weaker than the standard template."],
+            "missing_signatures": ["Signature not found for Jane Doe"],
+            "inconsistent_dates": ["The end date is before the start date."],
+            "clause_mismatches": ["Liability clause weaker than standard template."],
         }
     }
+
 
 if __name__ == "__main__":
     import uvicorn
