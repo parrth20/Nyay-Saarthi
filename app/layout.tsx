@@ -6,7 +6,9 @@ import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import "./globals.css"
+// @ts-ignore - allow side-effect CSS import without type declarations
+import "@/app/globals.css"
+
 
 export const metadata: Metadata = {
   title: "न्याय-सारथी | Nyay-Saarthi",

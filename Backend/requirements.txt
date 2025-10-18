@@ -1,14 +1,22 @@
 fastapi
 uvicorn
 python-multipart
-langchain
+langchain>=0.3.0,<0.4
+langchain-core>=0.3.0,<0.4
 langchain-community
-unstructured[pdf,easyocr] # <-- Update this line
+langchain-google-genai
+langchain-text-splitters
+unstructured[pdf,easyocr]
 qdrant-client
 pytesseract
 pdf2image
 python-dotenv
 google-generativeai
-langchain-google-genai
-sentence-transformers # <-- Add this for local embeddings
-torch # <-- Add this (required by sentence-transformers)
+sentence-transformers
+torch
+
+# extras required by the provided main.py (do not remove)
+nltk
+aiofiles
+python-magic
+pydantic
