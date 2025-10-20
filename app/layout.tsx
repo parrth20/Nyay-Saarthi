@@ -7,6 +7,7 @@ import { Suspense } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import "./globals.css"
+import { CustomCursor } from "@/components/CustomCursor"
 
 export const metadata: Metadata = {
   title: "न्याय-सारथी | Nyay-Saarthi",
@@ -22,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="hi">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+        <CustomCursor/>
         <Header />
         <main className="pt-20">
           <Suspense fallback={null}>{children}</Suspense>
