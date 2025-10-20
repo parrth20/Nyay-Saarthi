@@ -239,3 +239,7 @@
 .animate-delay-400 {
   animation-delay: 0.4s;
 }
+
+*{
+  cursor: none !important; /* hides default cursor */
+}
