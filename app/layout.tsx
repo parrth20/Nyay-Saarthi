@@ -8,6 +8,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import "./globals.css"
 import { CustomCursor } from "@/components/CustomCursor"
+import SmoothScroll from "@/components/SmoothScroll"
 
 export const metadata: Metadata = {
   title: "न्याय-सारथी | Nyay-Saarthi",
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="hi">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+        <SmoothScroll>
         <CustomCursor/>
         <Header />
         <main className="pt-20">
@@ -30,6 +32,7 @@ export default function RootLayout({
         </main>
         {/* <Footer /> */}
         <Analytics />
+        </SmoothScroll>
       </body>
     </html>
   )
