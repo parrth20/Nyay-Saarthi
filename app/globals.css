@@ -243,3 +243,7 @@
 *{
   cursor: none !important; /* hides default cursor */
 }
+
+[data-scroll-container] {
+  min-height: 100vh;
+}
