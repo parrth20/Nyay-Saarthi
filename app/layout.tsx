@@ -23,6 +23,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="hi">
+    <head>
+        {/* Add Favicon links directly in head */}
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        {/* You can add other sizes or formats too */}
+        {/* <link rel="icon" href="/favicon.ico" sizes="any" /> */}
+        {/* <link rel="apple-touch-icon" href="/apple-touch-icon.png" /> */}
+      </head>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <SmoothScroll>
         <CustomCursor/>
