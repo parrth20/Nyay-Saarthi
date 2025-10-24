@@ -1,24 +1,41 @@
-"use client"
+// app/chat/page.tsx
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Send, Bot, User, FileText, Clock, AlertTriangle, Lightbulb, MessageSquare } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useState, useRef, useEffect, Suspense } from "react"; // Added Suspense
+import { useSearchParams } from 'next/navigation'; // Import useSearchParams
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Send, Bot, User, FileText, Clock, AlertTriangle, Lightbulb, MessageSquare, BookOpen, ChevronDown } from "lucide-react"; // Added BookOpen, ChevronDown
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"; // Import Tooltip components
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible" // Import Collapsible
 
 interface Message {
-  id: number
-  content: string
-  sender: "user" | "ai"
-  timestamp: Date
-  type?: "text" | "suggestion" | "document-analysis"
-  sources?: { content: string; page: number }[]
+  id: number;
+  content: string;
+  sender: "user" | "ai";
+  timestamp: Date;
+  type?: "text" | "suggestion" | "document-analysis" | "context-info"; // Added context-info
+  sources?: { content: string; page: number | string }[]; // Allow page number to be string or number
 }
 
-export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
+// Wrap the main component logic in a new component to use Suspense
+function ChatComponent() {
+  const searchParams = useSearchParams();
+  const contextFileName = searchParams.get('contextFile'); // Get filename from URL
+
+  const initialMessages: Message[] = [
     {
       id: 1,
       content: "नमस्ते! मैं आपका AI कानूनी सहायक हूँ। आपके दस्तावेज़ों के बारे में कोई भी प्रश्न पूछें।",
@@ -26,287 +43,358 @@ export default function ChatPage() {
       timestamp: new Date(),
       type: "text",
     },
-  ])
-  const [inputMessage, setInputMessage] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+    // Add context message if filename exists in URL
+    ...(contextFileName ? [{
+      id: 1.5, // Unique ID
+      content: `फ़ाइल "${decodeURIComponent(contextFileName)}" के संदर्भ में पूछ रहे हैं।`,
+      sender: "ai" as const, // Ensure sender type is correct
+      timestamp: new Date(),
+      type: "context-info" as const, // New type for context info
+    }] : [])
+  ];
 
-  const suggestedQuestions = ["मुख्य जोखिम क्या है?", "समय सीमा कब तक है?", "भुगतान की शर्तें क्या हैं?"]
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const suggestedQuestions = ["मुख्य जोखिम क्या है?", "समय सीमा कब तक है?", "भुगतान की शर्तें क्या हैं?"];
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    scrollToBottom();
+  }, [messages]);
 
+  // Handle message sending (API call)
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim()) return;
 
     const userMessage: Message = {
-      id: messages.length + 1,
+      id: Date.now(), // Use timestamp for unique ID
       content: inputMessage,
       sender: "user",
       timestamp: new Date(),
       type: "text",
-    }
+    };
 
-    setMessages((prev) => [...prev, userMessage])
-    setInputMessage("")
-    setIsTyping(true)
+    setMessages((prev) => [...prev, userMessage]);
+    const currentInput = inputMessage; // Store input before clearing
+    setInputMessage("");
+    setIsTyping(true);
 
     try {
+      // **IMPORTANT**: You might need to send contextFileName or a relevant ID to the backend
+      const requestBody = {
+        question: currentInput,
+        // contextId: backendFileId // Example if you stored an ID
+      };
+
       const response = await fetch("https://parrth020-nyay-saarthi-ai-agent.hf.space/ask/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question: inputMessage }),
-      })
+        body: JSON.stringify(requestBody),
+      });
 
-      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
 
       const aiResponse: Message = {
-        id: messages.length + 2,
-        content: data.answer,
+        id: Date.now() + 1, // Unique ID
+        content: data.answer || "मुझे उत्तर नहीं मिल सका।", // Fallback message
         sender: "ai",
         timestamp: new Date(),
         type: "text",
-        sources: data.sources,
-      }
-      setMessages((prev) => [...prev, aiResponse])
-    } catch (error) {
+        sources: data.sources?.map((s: any) => ({ // Safely map sources
+            content: s.content || "N/A",
+            page: s.page || s.metadata?.page_number || "N/A" // Adapt based on actual backend response
+        })) || [],
+      };
+      setMessages((prev) => [...prev, aiResponse]);
+
+    } catch (error: any) {
+      console.error("API Error:", error); // Log the error
       const errorResponse: Message = {
-        id: messages.length + 2,
-        content: "Sorry, I encountered an error. Please try again.",
+        id: Date.now() + 1, // Unique ID
+        content: `क्षमा करें, मुझे एक त्रुटि आई (${error.message || 'Unknown error'}). कृपया पुनः प्रयास करें।`,
         sender: "ai",
         timestamp: new Date(),
         type: "text",
-      }
-      setMessages((prev) => [...prev, errorResponse])
+      };
+      setMessages((prev) => [...prev, errorResponse]);
     } finally {
-      setIsTyping(false)
+      setIsTyping(false);
     }
-  }
+  };
 
   const handleSuggestedQuestion = (question: string) => {
-    setInputMessage(question)
-  }
+    setInputMessage(question);
+    // Optionally trigger send directly:
+    // handleSendMessage(); // Uncomment if you want clicking a suggestion to send immediately
+  };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("hi-IN", {
+    return date.toLocaleTimeString("hi-IN", { // Use hi-IN for Hindi locale time
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
-    })
-  }
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50">
-      {/* Header */}
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Page Title */}
-          <div className="bg-white border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">AI सहायक से पूछें</h1>
-                <p className="text-gray-600">अपने दस्तावेज़ों के बारे में कोई भी प्रश्न पूछें और तुरंत उत्तर प्राप्त करें</p>
-              </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                <Bot className="h-4 w-4 mr-1" />
-                ऑनलाइन
-              </Badge>
+    <div className="flex h-[calc(100vh-80px)]"> {/* Adjusted height calculation */}
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-green-50 via-blue-50 to-purple-50"> {/* Added background */}
+        {/* Page Title */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">AI सहायक से पूछें</h1>
+              <p className="text-gray-600 text-sm"> {/* Smaller text */}
+                {contextFileName
+                  ? `"${decodeURIComponent(contextFileName)}" के बारे में प्रश्न पूछें`
+                  : "अपने दस्तावेज़ों के बारे में प्रश्न पूछें"}
+              </p>
             </div>
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              <Bot className="h-4 w-4 mr-1" />
+              ऑनलाइन
+            </Badge>
           </div>
+        </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`flex items-start gap-3 max-w-2xl ${message.sender === "user" ? "flex-row-reverse" : ""}`}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback
-                      className={
-                        message.sender === "user" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
-                      }
-                    >
-                      {message.sender === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div
-                    className={`rounded-lg p-4 ${
-                      message.sender === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200"
-                    }`}
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.map((message) => (
+            <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`flex items-start gap-3 max-w-xl md:max-w-2xl ${message.sender === "user" ? "flex-row-reverse" : ""}`} // Adjusted max-width
+              >
+                <Avatar className="h-8 w-8 flex-shrink-0"> {/* Added flex-shrink-0 */}
+                  <AvatarFallback
+                    className={
+                      message.sender === "user" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
+                    }
                   >
-                    <p className="text-sm">{message.content}</p>
-                    {message.sources && (
-                      <div className="mt-4">
-                        <h4 className="font-bold">Sources:</h4>
+                    {message.sender === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                  </AvatarFallback>
+                </Avatar>
+                <div
+                  className={`rounded-lg p-3 md:p-4 shadow-sm ${ // Added shadow, adjusted padding
+                    message.sender === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-800"
+                  } ${message.type === 'context-info' ? 'bg-amber-50 border-amber-200 text-amber-800 italic' : ''}`} // Context info style
+                >
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p> {/* Added whitespace-pre-wrap */}
+
+                  {/* Collapsible Sources Section */}
+                  {message.sender === "ai" && message.sources && message.sources.length > 0 && (
+                    <Collapsible className="mt-3">
+                      <CollapsibleTrigger asChild>
+                         <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100">
+                            स्रोत देखें ({message.sources.length})
+                           <ChevronDown className="h-3 w-3 ml-1 transition-transform data-[state=open]:rotate-180" />
+                         </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2 space-y-2 animate-accordion-down">
                         {message.sources.map((source, index) => (
-                          <div key={index} className="mt-2 p-2 bg-gray-100 rounded">
-                            <p className="text-xs text-gray-700">
-                              {source.content} (Page: {source.page})
-                            </p>
+                          <div key={index} className="p-2 bg-gray-100 rounded border border-gray-200 text-xs text-gray-700">
+                            <p className="line-clamp-3 mb-1 italic">"{source.content}"</p> {/* Show snippet */}
+                            <p className="font-medium">पृष्ठ: {source.page}</p>
                           </div>
                         ))}
-                      </div>
-                    )}
-                    <p className={`text-xs mt-2 ${message.sender === "user" ? "text-blue-100" : "text-gray-500"}`}>
-                      {formatTime(message.timestamp)}
-                    </p>
-                  </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+
+                  {/* Timestamp (only for non-context messages) */}
+                  {message.type !== 'context-info' && (
+                     <p className={`text-xs mt-2 text-right ${message.sender === "user" ? "text-blue-100 opacity-80" : "text-gray-400"}`}>
+                        {formatTime(message.timestamp)}
+                      </p>
+                  )}
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
 
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="flex items-start gap-3 max-w-2xl">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-green-100 text-green-600">
-                      <Bot className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      ></div>
-                    </div>
+          {/* Typing Indicator */}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="flex items-start gap-3 max-w-2xl">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarFallback className="bg-green-100 text-green-600">
+                    <Bot className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                  <div className="flex space-x-1.5"> {/* Increased spacing */}
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-75"></div> {/* Use utility */}
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></div> {/* Use utility */}
                   </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Suggested Questions */}
-          {messages.length === 1 && (
-            <div className="px-6 pb-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">सुझाए गए प्रश्न:</h3>
-                <div className="flex flex-wrap gap-2">
-                  {suggestedQuestions.map((question, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSuggestedQuestion(question)}
-                      className="text-sm"
-                    >
-                      {question}
-                    </Button>
-                  ))}
                 </div>
               </div>
             </div>
           )}
+          <div ref={messagesEndRef} />
+        </div>
 
-          {/* Input Area */}
-          <div className="border-t border-gray-200 bg-white p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex-1 relative">
-                <Input
-                  placeholder="अपना प्रश्न यहाँ लिखें..."
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                  className="pr-12"
-                />
-                <Button
-                  size="sm"
-                  onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isTyping}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+        {/* Suggested Questions */}
+        {/* Show suggestions if it's the beginning of chat OR after context msg */}
+        {(messages.length === 1 || (messages.length === 2 && messages[1]?.type === 'context-info')) && !isTyping && (
+          <div className="px-6 pb-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">सुझाए गए प्रश्न:</h3>
+              <div className="flex flex-wrap gap-2">
+                {suggestedQuestions.map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSuggestedQuestion(question)}
+                    className="text-sm"
+                  >
+                    {question}
+                  </Button>
+                ))}
               </div>
             </div>
           </div>
+        )}
+
+        {/* Input Area */}
+        <div className="border-t border-gray-200 bg-white p-4 md:p-6"> {/* Adjusted padding */}
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex-1 relative">
+              <Input
+                placeholder="अपना प्रश्न यहाँ लिखें..."
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } } } // Prevent default Enter, allow Shift+Enter
+                className="pr-12 h-10 md:h-11" // Adjusted height
+                disabled={isTyping}
+              />
+              <Button
+                size="icon" // Use icon size
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isTyping}
+                className="absolute right-1.5 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300" // Added disabled style
+                aria-label="Send message"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Sidebar */}
-        <div className="w-80 bg-white border-l border-gray-200 p-6">
+      {/* Sidebar */}
+      <TooltipProvider delayDuration={100}> {/* Wrap sidebar content in provider */}
+        <div className="w-64 md:w-80 bg-white border-l border-gray-200 p-4 md:p-6 hidden lg:block"> {/* Adjusted width, hide on smaller screens */}
           <div className="space-y-6">
-            {/* Current Document */}
+            {/* Current Document (Optional - could show contextFileName) */}
+             <Card>
+               <CardHeader className="pb-3"> {/* Reduced bottom padding */}
+                 <CardTitle className="text-base md:text-lg flex items-center gap-2"> {/* Adjusted text size */}
+                   <FileText className="h-5 w-5" />
+                   चैट संदर्भ
+                 </CardTitle>
+               </CardHeader>
+               <CardContent>
+                 {contextFileName ? (
+                   <p className="text-sm text-gray-600 truncate">
+                      फ़ाइल: {decodeURIComponent(contextFileName)}
+                   </p>
+                 ) : (
+                   <p className="text-sm text-gray-500 italic">
+                     कोई विशिष्ट दस्तावेज़ चयनित नहीं है।
+                   </p>
+                 )}
+               </CardContent>
+             </Card>
+
+            {/* Quick Actions with Tooltips */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  कानूनी दस्तावेज़ चैट सहायक
-                </CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base md:text-lg">त्वरित कार्य</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                  <Bot className="h-4 w-4" />
-                  <span>नमस्ते! मैं आपका AI कानूनी सहायक हूँ। आपके दस्तावेज़ों के बारे में कोई भी प्रश्न पूछें।</span>
-                </div>
-                <p className="text-xs text-gray-500">02:37 pm</p>
+              <CardContent className="space-y-3">
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm"> {/* Adjusted style */}
+                          <FileText className="h-4 w-4 mr-2" />
+                          दस्तावेज़ विश्लेषण
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-xs">
+                        दस्तावेज़ का विस्तृत विश्लेषण शुरू करें।
+                    </TooltipContent>
+                  </Tooltip>
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm">
+                          <AlertTriangle className="h-4 w-4 mr-2" />
+                          जोखिम मूल्यांकन
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-xs">
+                        दस्तावेज़ में संभावित जोखिमों की पहचान करें।
+                    </TooltipContent>
+                  </Tooltip>
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm">
+                          <Lightbulb className="h-4 w-4 mr-2" />
+                          AI सुझाव
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-xs">
+                        दस्तावेज़ में सुधार के लिए AI सुझाव प्राप्त करें।
+                    </TooltipContent>
+                  </Tooltip>
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm">
+                          <Clock className="h-4 w-4 mr-2" />
+                          अनुबंध समीक्षा
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-xs">
+                        अनुबंध की शर्तों और समय-सीमाओं की समीक्षा करें।
+                    </TooltipContent>
+                  </Tooltip>
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
+            {/* Recent Chats (Placeholder) */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">त्वरित कार्य</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base md:text-lg">हाल की चर्चाएं</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <FileText className="h-4 w-4 mr-2" />
-                  दस्तावेज़ विश्लेषण
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  जोखिम मूल्यांकन
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  AI सहायक
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <Clock className="h-4 w-4 mr-2" />
-                  अनुबंध समीक्षा
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Recent Chats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">हाल की चर्चाएं</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <div className="flex items-center gap-2 mb-1">
-                    <MessageSquare className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium">सेवा समझौता प्रश्न</span>
-                  </div>
-                  <p className="text-xs text-gray-500">2 घंटे पहले</p>
-                </div>
-                <div className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <div className="flex items-center gap-2 mb-1">
-                    <MessageSquare className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium">किराया अनुबंध समीक्षा</span>
-                  </div>
-                  <p className="text-xs text-gray-500">1 दिन पहले</p>
-                </div>
+                {/* Add dynamic recent chats later */}
+                 <p className="text-sm text-gray-500 italic text-center py-4">कोई हाल की चर्चा नहीं।</p>
               </CardContent>
             </Card>
           </div>
         </div>
-      </div>
+      </TooltipProvider>
     </div>
-  )
+  );
+}
+
+// Export default wrapper using Suspense for useSearchParams
+export default function ChatPage() {
+    return (
+        <Suspense fallback={<div>Loading chat...</div>}> {/* Add a basic fallback */}
+            <ChatComponent />
+        </Suspense>
+    );
 }
