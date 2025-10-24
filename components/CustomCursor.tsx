@@ -114,4 +114,5 @@ export const CustomCursor = () => {
     </>,
     document.body
   )
+  
 }
