@@ -31,7 +31,7 @@ export default function RootLayout({
         {/* <link rel="apple-touch-icon" href="/apple-touch-icon.png" /> */}
       </head>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <SmoothScroll>
+        {/* <SmoothScroll> */}
         <CustomCursor/>
         <Header />
         <main className="pt-20">
@@ -39,7 +39,7 @@ export default function RootLayout({
         </main>
         {/* <Footer /> */}
         <Analytics />
-        </SmoothScroll>
+        {/* </SmoothScroll> */}
       </body>
     </html>
   )
