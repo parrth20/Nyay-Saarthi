@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, CheckCircle, X, AlertCircle, Loader2 } from "lucide-react";
-import { toast } from "sonner"; // Ensure toast is imported
+import { toast } from "sonner";
 
 interface UploadedFile {
   file: File;
@@ -17,6 +17,7 @@ interface UploadedFile {
   status: "uploading" | "processing" | "complete" | "error";
   result?: string;
   error?: string;
+  // backendFileId?: string; // Optional: Store backend identifier if returned
 }
 
 export default function UploadPage() {
@@ -24,9 +25,13 @@ export default function UploadPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const router = useRouter();
 
+  // Updated: Now pushes filename as query param
   const handleViewResult = (fileId: string) => {
-    // Potentially pass file context or ID to the chat page if needed
-    router.push("/chat");
+    const file = uploadedFiles.find(f => f.id === fileId);
+    // Pass filename as a query parameter (example context)
+    // The chat page would need to read this using useSearchParams
+    const queryParams = file ? `?contextFile=${encodeURIComponent(file.file.name)}` : '';
+    router.push(`/chat${queryParams}`);
   };
 
    // --- Extracted upload logic ---
@@ -45,12 +50,29 @@ export default function UploadPage() {
         mode: "cors",
       });
 
+      // --- Assuming backend returns some ID or info ---
+      // let backendInfo = {}; // Placeholder
+      // if (response.ok) {
+      //   try {
+      //     backendInfo = await response.json(); // If backend sends JSON on success
+      //   } catch (jsonError) {
+      //     console.error("Failed to parse success response:", jsonError);
+      //   }
+      // }
+      // --- End assumption ---
+
+
       if (response.ok) {
         const resultMessage = "File processed successfully!";
         setUploadedFiles((prev) =>
           prev.map((f) =>
             f.id === fileId
-              ? { ...f, status: "complete", result: resultMessage }
+              ? {
+                  ...f,
+                  status: "complete",
+                  result: resultMessage,
+                  // backendFileId: backendInfo.fileId // Store backend ID if available
+                }
               : f
           )
         );
@@ -59,7 +81,7 @@ export default function UploadPage() {
            description: `${file.name} का सफलतापूर्वक विश्लेषण किया गया।`,
            action: {
              label: "परिणाम देखें",
-             onClick: () => handleViewResult(fileId),
+             onClick: () => handleViewResult(fileId), // Calls the updated function
            },
         });
       } else {
@@ -160,43 +182,43 @@ export default function UploadPage() {
       <div className="container mx-auto max-w-4xl px-4 py-8">
         {/* Dropzone Card */}
         <Card
-          className={`border-2 border-dashed transition-all duration-300 mb-8 ${
+            className={`border-2 border-dashed transition-all duration-300 mb-8 ${
             isDragOver
-              ? "border-primary bg-primary/10 scale-[1.03] shadow-inner ring-4 ring-primary/20" // Enhanced drag over styles
-              : "border-border hover:border-primary/50"
-          }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+                ? "border-primary bg-primary/10 scale-[1.03] shadow-inner ring-4 ring-primary/20"
+                : "border-border hover:border-primary/50"
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
         >
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Upload className={`w-8 h-8 text-primary transition-transform ${isDragOver ? "scale-110" : ""}`} />
-            </div>
-            <CardTitle className="text-2xl">अपना कानूनी दस्तावेज़ अपलोड करें</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-6">
-            <p className="text-muted-foreground">PDF, DOCX, TXT, PNG, JPG, JPEG चुनें (अधिकतम 10MB)</p>
-            <div className="space-y-4">
-              <input
-                type="file"
-                id="file-upload"
-                className="hidden"
-                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
-                multiple
-                onChange={handleFileInputChange}
-              />
-              <label htmlFor="file-upload">
-                <Button size="lg" className="w-full max-w-xs cursor-pointer" asChild>
-                  <span>
-                    <FileText className="w-5 h-5 mr-2" />
-                    फाइल चुनें
-                  </span>
-                </Button>
-              </label>
-              <p className="text-sm text-muted-foreground">या फाइल को यहाँ खींचकर छोड़ें</p>
-            </div>
-          </CardContent>
+            <CardHeader className="text-center">
+                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                   <Upload className={`w-8 h-8 text-primary transition-transform ${isDragOver ? "scale-110" : ""}`} />
+                 </div>
+                 <CardTitle className="text-2xl">अपना कानूनी दस्तावेज़ अपलोड करें</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-6">
+                <p className="text-muted-foreground">PDF, DOCX, TXT, PNG, JPG, JPEG चुनें (अधिकतम 10MB)</p>
+                <div className="space-y-4">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+                    multiple
+                    onChange={handleFileInputChange}
+                  />
+                  <label htmlFor="file-upload">
+                    <Button size="lg" className="w-full max-w-xs cursor-pointer" asChild>
+                      <span>
+                        <FileText className="w-5 h-5 mr-2" />
+                        फाइल चुनें
+                      </span>
+                    </Button>
+                  </label>
+                  <p className="text-sm text-muted-foreground">या फाइल को यहाँ खींचकर छोड़ें</p>
+                </div>
+            </CardContent>
         </Card>
 
         {/* Uploaded Files List */}
@@ -206,16 +228,17 @@ export default function UploadPage() {
             {uploadedFiles.map((uploadedFile) => (
               <Card key={uploadedFile.id} className="relative overflow-hidden">
                 <CardContent className="p-4">
+                 {/* File info and remove button */}
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3 overflow-hidden mr-2">
-                      <FileText className="w-5 h-5 text-primary flex-shrink-0" />
-                      <div className="flex-grow overflow-hidden">
-                        <p className="font-medium truncate leading-tight">{uploadedFile.file.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          ({(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB)
-                        </p>
-                      </div>
-                    </div>
+                     <div className="flex items-center gap-3 overflow-hidden mr-2">
+                       <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                       <div className="flex-grow overflow-hidden">
+                         <p className="font-medium truncate leading-tight">{uploadedFile.file.name}</p>
+                         <p className="text-xs text-muted-foreground">
+                           ({(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB)
+                         </p>
+                       </div>
+                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -247,25 +270,22 @@ export default function UploadPage() {
 
                   {uploadedFile.status === "complete" && (
                     <div className="space-y-2 pt-2">
-                       {/* Success message handled by toast */}
                       <div className="flex gap-2">
+                        {/* Ensure onClick calls handleViewResult with ID */}
                         <Button size="sm" onClick={() => handleViewResult(uploadedFile.id)}>
                           परिणाम देखें
                         </Button>
-                        {/* Add download functionality later if needed */}
-                        {/* <Button variant="outline" size="sm">
-                          डाउनलोड करें
-                        </Button> */}
+                         {/* Optional Download Button */}
                       </div>
                     </div>
                   )}
 
-                  {uploadedFile.status === "error" && (
-                    <div className="flex items-center gap-2 text-sm text-destructive pt-1"> {/* Added pt-1 */}
-                      <AlertCircle className="w-4 h-4" />
-                      <span>त्रुटि: {uploadedFile.error || "Unknown error occurred"}</span>
-                    </div>
-                  )}
+                   {uploadedFile.status === "error" && (
+                     <div className="flex items-center gap-2 text-sm text-destructive pt-1">
+                       <AlertCircle className="w-4 h-4" />
+                       <span>त्रुटि: {uploadedFile.error || "Unknown error occurred"}</span>
+                     </div>
+                   )}
                 </CardContent>
               </Card>
             ))}
