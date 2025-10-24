@@ -1,5 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, MessageSquare, AlertTriangle, Clock, Shield, Languages } from "lucide-react"
+// components/features.tsx
+"use client"; // Required for Framer Motion client components
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileText, MessageSquare, AlertTriangle, Clock, Shield, Languages } from "lucide-react";
+import { motion } from "framer-motion"; // Import motion
 
 const features = [
   {
@@ -38,37 +42,87 @@ const features = [
     description: "हिंदी, अंग्रेजी और अन्य भारतीय भाषाओं में दस्तावेज़ समझें।",
     color: "text-indigo-600",
   },
-]
+];
+
+// Animation variants for staggering children
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1, // Delay between each card animating in
+      delayChildren: 0.2, // Small delay before children start animating
+    },
+  },
+};
+
+// **CORRECTED Animation variants for individual items**
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 }, // Start slightly down and faded out
+  visible: {
+    opacity: 1,
+    y: 0,
+    // Define transition properties directly on the target variant
+    transition: {
+      duration: 0.6,
+      ease: "easeOut", // Standard easing function name
+    },
+  },
+};
+
 
 export function Features() {
   return (
     <section className="py-20 px-4 bg-muted/30">
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-balance mb-4">
+          {/* Animate the header text too */}
+          <motion.h2
+            className="text-3xl md:text-4xl font-bold text-balance mb-4"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.5 }}
+            transition={{ duration: 0.5 }}
+          >
             क्यों चुनें हमारा <span className="text-primary">AI समाधान</span>?
-          </h2>
-          <p className="text-xl text-muted-foreground text-balance max-w-2xl mx-auto">
+          </motion.h2>
+          <motion.p
+            className="text-xl text-muted-foreground text-balance max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.5 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
             कानूनी दस्तावेज़ों को समझना अब आसान। हमारी उन्नत तकनीक आपको सटीक और विश्वसनीय जानकारी देती है।
-          </p>
+          </motion.p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Wrap the grid in a motion.div */}
+        <motion.div
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible" // Trigger animation when in view
+          viewport={{ once: true, amount: 0.2 }} // Trigger once, when 20% is visible
+        >
           {features.map((feature, index) => (
-            <Card key={index} className="border-0 shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className={`w-12 h-12 rounded-lg bg-background flex items-center justify-center mb-4`}>
-                  <feature.icon className={`w-6 h-6 ${feature.color}`} />
-                </div>
-                <CardTitle className="text-xl">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
-              </CardContent>
-            </Card>
+            // Wrap each Card in a motion.div
+            <motion.div key={index} variants={itemVariants} className="h-full"> {/* Ensure motion div takes full height */}
+              <Card className="border-0 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full flex flex-col"> {/* Added h-full and flex */}
+                <CardHeader>
+                  <div className={`w-12 h-12 rounded-lg bg-background flex items-center justify-center mb-4`}>
+                    <feature.icon className={`w-6 h-6 ${feature.color}`} />
+                  </div>
+                  <CardTitle className="text-xl">{feature.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow"> {/* Allow content to grow */}
+                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
-  )
+  );
 }
