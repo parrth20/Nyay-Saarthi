@@ -56,14 +56,13 @@ const containerVariants = {
   },
 };
 
-// **CORRECTED Animation variants for individual items**
+// Animation variants for individual items
 const itemVariants = {
   hidden: { opacity: 0, y: 30 }, // Start slightly down and faded out
   visible: {
     opacity: 1,
     y: 0,
-    // Define transition properties directly on the target variant
-    transition: {
+    transition: { // Nested transition object is correct here
       duration: 0.6,
       ease: "easeOut", // Standard easing function name
     },
