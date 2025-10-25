@@ -8,7 +8,7 @@ import { FileText, AlertTriangle, Calendar, Clock, Upload, Search, Inbox } from 
 import { Input } from "@/components/ui/input"
 import Link from 'next/link'; // Import Link
 
-// --- Mock Data (Replace with actual data fetching) ---
+// --- Mock Data (Replace/Remove for actual data fetching) ---
 interface Document {
     id: string;
     name: string;
@@ -18,18 +18,19 @@ interface Document {
     analysisProgress?: number;
 }
 
+// !! IMPORTANT: Keep this EMPTY to test the empty state !!
 const recentDocuments: Document[] = [
-    // Example data - replace or remove for empty state test
     // { id: '1', name: 'सेवा समझौता - ABC कंपनी', type: 'अनुबंध', status: 'विश्लेषित', date: 'आज', analysisProgress: 100 },
     // { id: '2', name: 'गोपनीयता नीति - XYZ ऐप', type: 'नीति', status: 'प्रगति में', date: 'कल', analysisProgress: 75 },
 ];
 
 const stats = [
-    { label: "कुल दस्तावेज़", value: recentDocuments.length, change: "+3 इस सप्ताह", icon: FileText, color: "text-blue-600 bg-blue-100" },
-    { label: "उच्च जोखिम", value: recentDocuments.filter(d => d.status === 'विश्लेषित').length > 0 ? 1 : 0, change: "-1 पिछले महीने से", icon: AlertTriangle, color: "text-orange-600 bg-orange-100" }, // Simplified logic
-    { label: "आगामी समय सीमा", value: 3, change: "अगले 30 दिनों में", icon: Calendar, color: "text-purple-600 bg-purple-100" },
-    { label: "समय की बचत", value: "~8 घंटे", change: "इस महीने", icon: Clock, color: "text-green-600 bg-green-100" },
+    { label: "कुल दस्तावेज़", value: recentDocuments.length, change: "+0 इस सप्ताह", icon: FileText, color: "text-blue-600 bg-blue-100" },
+    { label: "उच्च जोखिम", value: 0, change: "0", icon: AlertTriangle, color: "text-orange-600 bg-orange-100" },
+    { label: "आगामी समय सीमा", value: 0, change: "N/A", icon: Calendar, color: "text-purple-600 bg-purple-100" },
+    { label: "समय की बचत", value: "~0 घंटे", change: "इस महीने", icon: Clock, color: "text-green-600 bg-green-100" },
 ];
+// Update stats logic based on actual data
 // --- End Mock Data ---
 
 
@@ -48,31 +49,36 @@ export default async function Dashboard() {
   //   .select('*')
   //   .eq('user_id', user.id) // Filter by user ID
   //   .order('created_at', { ascending: false })
-  //   .limit(5); // Get recent 5
+  //   .limit(5);
   //
-  // const documents = fetchedDocuments || []; // Use fetched data or default to empty
-  // Update stats based on fetched data
-  // --- End Real Data Fetching ---
+  // const documentsToDisplay = fetchedDocuments || []; // Use fetched data
+  // Recalculate stats based on fetchedDocuments
+  // ---
 
-  // Use the mock or fetched data
-  const documentsToDisplay = recentDocuments; // Change to 'documents' if using real fetch
+  // Use the mock or fetched data for now
+  const documentsToDisplay = recentDocuments;
+
+  // --- Update stats based on documentsToDisplay (example) ---
+  stats[0].value = documentsToDisplay.length;
+  // Add logic to calculate other stats based on actual data structure
+  // ---
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 p-6 md:p-8"> {/* Added padding */}
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 p-6 md:p-8">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"> {/* Adjusted flex for mobile */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 md:mb-2">डैशबोर्ड</h1>
             <p className="text-gray-600 text-sm md:text-base">अपने दस्तावेज़ों का अवलोकन और विश्लेषण</p>
           </div>
-          <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto"> {/* Adjusted width for mobile */}
+          <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto">
             <div className="relative flex-grow md:flex-grow-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input placeholder="दस्तावेज़ खोजें..." className="pl-10 w-full md:w-64 h-10" /> {/* Ensured height */}
+              <Input placeholder="दस्तावेज़ खोजें..." className="pl-10 w-full md:w-64 h-10" />
             </div>
             <Link href="/upload">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md h-10 whitespace-nowrap"> {/* Ensured height, added whitespace */}
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md h-10 whitespace-nowrap">
                 <Upload className="h-4 w-4 mr-2" />
                 नया अपलोड करें
               </Button>
@@ -111,10 +117,10 @@ export default async function Dashboard() {
         <CardContent>
           {/* --- Empty State Check --- */}
           {documentsToDisplay.length === 0 ? (
-            <div className="text-center py-12 px-6 border-2 border-dashed border-gray-200 rounded-lg">
+            <div className="text-center py-12 px-6 border-2 border-dashed border-gray-200 rounded-lg bg-white"> {/* Added bg-white */}
                 <Inbox className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">कोई दस्तावेज़ नहीं मिला</h3>
-                <p className="text-gray-500 mb-4">विश्लेषण शुरू करने के लिए अपना पहला दस्तावेज़ अपलोड करें।</p>
+                <p className="text-gray-500 mb-4 max-w-xs mx-auto">विश्लेषण शुरू करने के लिए अपना पहला दस्तावेज़ अपलोड करें।</p> {/* Limited width */}
                 <Link href="/upload">
                     <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                         <Upload className="h-4 w-4 mr-2" />
@@ -126,7 +132,7 @@ export default async function Dashboard() {
             // --- Document List ---
             <div className="space-y-4">
               {documentsToDisplay.map((doc) => (
-                <div key={doc.id} className="border border-gray-100 rounded-lg p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:bg-gray-50 transition-colors">
+                <div key={doc.id} className="border border-gray-100 rounded-lg p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:bg-gray-50 transition-colors bg-white"> {/* Added bg-white */}
                   <div className="flex-grow">
                     <h4 className="font-semibold text-gray-900 mb-1">{doc.name}</h4>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -139,8 +145,7 @@ export default async function Dashboard() {
                     </div>
                     {doc.analysisProgress !== undefined && doc.analysisProgress < 100 && (
                        <div className="mt-2">
-                         {/* Consider adding a small Progress bar here if needed */}
-                         {/* <Progress value={doc.analysisProgress} className="h-1 w-32" /> */}
+                         {/* Optional Progress bar */}
                        </div>
                     )}
                   </div>
@@ -158,8 +163,6 @@ export default async function Dashboard() {
           {/* --- End Conditional Rendering --- */}
         </CardContent>
       </Card>
-
-      {/* Add other dashboard sections here */}
 
     </div>
   );
