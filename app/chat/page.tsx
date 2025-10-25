@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react"; // Make sure Loader2 is imported if used in Suspense fallback
 import { Send, Bot, User, FileText, Clock, AlertTriangle, Lightbulb, MessageSquare, BookOpen, ChevronDown } from "lucide-react"; // Added BookOpen, ChevronDown
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -19,10 +20,10 @@ import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-} from "@/components/ui/collapsible" // Import Collapsible
+} from "@/components/ui/collapsible"; // Import Collapsible
 
 interface Message {
-  id: number;
+  id: number | string; // Allow string IDs for potential future use
   content: string;
   sender: "user" | "ai";
   timestamp: Date;
@@ -45,7 +46,7 @@ function ChatComponent() {
     },
     // Add context message if filename exists in URL
     ...(contextFileName ? [{
-      id: 1.5, // Unique ID
+      id: 'context-info', // Use a specific string ID
       content: `फ़ाइल "${decodeURIComponent(contextFileName)}" के संदर्भ में पूछ रहे हैं।`,
       sender: "ai" as const, // Ensure sender type is correct
       timestamp: new Date(),
@@ -73,7 +74,7 @@ function ChatComponent() {
     if (!inputMessage.trim()) return;
 
     const userMessage: Message = {
-      id: Date.now(), // Use timestamp for unique ID
+      id: Date.now().toString(), // Use timestamp string for unique ID
       content: inputMessage,
       sender: "user",
       timestamp: new Date(),
@@ -101,13 +102,13 @@ function ChatComponent() {
       });
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+        throw new Error(`API Error: ${response.statusText} (${response.status})`);
       }
 
       const data = await response.json();
 
       const aiResponse: Message = {
-        id: Date.now() + 1, // Unique ID
+        id: (Date.now() + 1).toString(), // Unique ID
         content: data.answer || "मुझे उत्तर नहीं मिल सका।", // Fallback message
         sender: "ai",
         timestamp: new Date(),
@@ -122,7 +123,7 @@ function ChatComponent() {
     } catch (error: any) {
       console.error("API Error:", error); // Log the error
       const errorResponse: Message = {
-        id: Date.now() + 1, // Unique ID
+        id: (Date.now() + 1).toString(), // Unique ID
         content: `क्षमा करें, मुझे एक त्रुटि आई (${error.message || 'Unknown error'}). कृपया पुनः प्रयास करें।`,
         sender: "ai",
         timestamp: new Date(),
@@ -197,18 +198,21 @@ function ChatComponent() {
                   {message.sender === "ai" && message.sources && message.sources.length > 0 && (
                     <Collapsible className="mt-3">
                       <CollapsibleTrigger asChild>
-                         <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100">
+                         <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 data-[state=open]:text-gray-700"> {/* Added open state style */}
+                            <BookOpen className="h-3 w-3 mr-1"/> {/* Added icon */}
                             स्रोत देखें ({message.sources.length})
-                           <ChevronDown className="h-3 w-3 ml-1 transition-transform data-[state=open]:rotate-180" />
+                           <ChevronDown className="h-3 w-3 ml-1 transition-transform duration-200 data-[state=open]:rotate-180" /> {/* Added duration */}
                          </Button>
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-2 space-y-2 animate-accordion-down">
-                        {message.sources.map((source, index) => (
-                          <div key={index} className="p-2 bg-gray-100 rounded border border-gray-200 text-xs text-gray-700">
-                            <p className="line-clamp-3 mb-1 italic">"{source.content}"</p> {/* Show snippet */}
-                            <p className="font-medium">पृष्ठ: {source.page}</p>
-                          </div>
-                        ))}
+                      <CollapsibleContent className="mt-2 space-y-2 animate-accordion-down overflow-hidden"> {/* Added overflow-hidden */}
+                        <div className="border-l-2 border-gray-300 pl-3 space-y-2"> {/* Added indent and spacing */}
+                            {message.sources.map((source, index) => (
+                              <div key={index} className="p-2 bg-gray-50 rounded border border-gray-200 text-xs text-gray-700">
+                                <p className="line-clamp-3 mb-1 italic">"{source.content}"</p> {/* Show snippet */}
+                                <p className="font-medium">पृष्ठ: {source.page}</p>
+                              </div>
+                            ))}
+                        </div>
                       </CollapsibleContent>
                     </Collapsible>
                   )}
@@ -226,28 +230,27 @@ function ChatComponent() {
 
           {/* Typing Indicator */}
           {isTyping && (
-            <div className="flex justify-start">
-              <div className="flex items-start gap-3 max-w-2xl">
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarFallback className="bg-green-100 text-green-600">
-                    <Bot className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                  <div className="flex space-x-1.5"> {/* Increased spacing */}
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-75"></div> {/* Use utility */}
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></div> {/* Use utility */}
-                  </div>
-                </div>
-              </div>
-            </div>
+             <div className="flex justify-start">
+               <div className="flex items-start gap-3 max-w-2xl">
+                 <Avatar className="h-8 w-8 flex-shrink-0">
+                   <AvatarFallback className="bg-green-100 text-green-600">
+                     <Bot className="h-4 w-4" />
+                   </AvatarFallback>
+                 </Avatar>
+                 <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                   <div className="flex space-x-1.5">
+                     <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                     <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-75"></div>
+                     <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></div>
+                   </div>
+                 </div>
+               </div>
+             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Suggested Questions */}
-        {/* Show suggestions if it's the beginning of chat OR after context msg */}
         {(messages.length === 1 || (messages.length === 2 && messages[1]?.type === 'context-info')) && !isTyping && (
           <div className="px-6 pb-4">
             <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
@@ -270,22 +273,22 @@ function ChatComponent() {
         )}
 
         {/* Input Area */}
-        <div className="border-t border-gray-200 bg-white p-4 md:p-6"> {/* Adjusted padding */}
+        <div className="border-t border-gray-200 bg-white p-4 md:p-6">
           <div className="flex items-center gap-2 md:gap-4">
             <div className="flex-1 relative">
               <Input
                 placeholder="अपना प्रश्न यहाँ लिखें..."
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } } } // Prevent default Enter, allow Shift+Enter
-                className="pr-12 h-10 md:h-11" // Adjusted height
+                onKeyPress={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } } }
+                className="pr-12 h-10 md:h-11"
                 disabled={isTyping}
               />
               <Button
-                size="icon" // Use icon size
+                size="icon"
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isTyping}
-                className="absolute right-1.5 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300" // Added disabled style
+                className="absolute right-1.5 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300"
                 aria-label="Send message"
               >
                 <Send className="h-4 w-4" />
@@ -295,23 +298,30 @@ function ChatComponent() {
         </div>
       </div>
 
-      {/* Sidebar */}
+      {/* --- Sidebar with Tooltips --- */}
       <TooltipProvider delayDuration={100}> {/* Wrap sidebar content in provider */}
-        <div className="w-64 md:w-80 bg-white border-l border-gray-200 p-4 md:p-6 hidden lg:block"> {/* Adjusted width, hide on smaller screens */}
+        <div className="w-64 md:w-80 bg-white border-l border-gray-200 p-4 md:p-6 hidden lg:block overflow-y-auto"> {/* Adjusted width, hide on smaller screens, added scroll */}
           <div className="space-y-6">
-            {/* Current Document (Optional - could show contextFileName) */}
+            {/* Current Document (Shows contextFileName) */}
              <Card>
-               <CardHeader className="pb-3"> {/* Reduced bottom padding */}
-                 <CardTitle className="text-base md:text-lg flex items-center gap-2"> {/* Adjusted text size */}
+               <CardHeader className="pb-3">
+                 <CardTitle className="text-base md:text-lg flex items-center gap-2">
                    <FileText className="h-5 w-5" />
                    चैट संदर्भ
                  </CardTitle>
                </CardHeader>
                <CardContent>
                  {contextFileName ? (
-                   <p className="text-sm text-gray-600 truncate">
-                      फ़ाइल: {decodeURIComponent(contextFileName)}
-                   </p>
+                   <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-sm text-gray-600 truncate cursor-help">
+                            फ़ाइल: {decodeURIComponent(contextFileName)}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="start">
+                        {decodeURIComponent(contextFileName)}
+                      </TooltipContent>
+                   </Tooltip>
                  ) : (
                    <p className="text-sm text-gray-500 italic">
                      कोई विशिष्ट दस्तावेज़ चयनित नहीं है।
@@ -328,64 +338,71 @@ function ChatComponent() {
               <CardContent className="space-y-3">
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm"> {/* Adjusted style */}
+                        {/* Make button trigger an action or link */}
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm" onClick={() => alert('Start Document Analysis...')}>
                           <FileText className="h-4 w-4 mr-2" />
                           दस्तावेज़ विश्लेषण
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right" className="text-xs">
+                    <TooltipContent side="left" className="text-xs">
                         दस्तावेज़ का विस्तृत विश्लेषण शुरू करें।
                     </TooltipContent>
                   </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm">
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm" onClick={() => alert('Start Risk Assessment...')}>
                           <AlertTriangle className="h-4 w-4 mr-2" />
                           जोखिम मूल्यांकन
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right" className="text-xs">
+                    <TooltipContent side="left" className="text-xs">
                         दस्तावेज़ में संभावित जोखिमों की पहचान करें।
                     </TooltipContent>
                   </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm">
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm" onClick={() => alert('Get AI Suggestions...')}>
                           <Lightbulb className="h-4 w-4 mr-2" />
                           AI सुझाव
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right" className="text-xs">
+                    <TooltipContent side="left" className="text-xs">
                         दस्तावेज़ में सुधार के लिए AI सुझाव प्राप्त करें।
                     </TooltipContent>
                   </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm">
+                        <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm" onClick={() => alert('Start Contract Review...')}>
                           <Clock className="h-4 w-4 mr-2" />
                           अनुबंध समीक्षा
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right" className="text-xs">
+                    <TooltipContent side="left" className="text-xs">
                         अनुबंध की शर्तों और समय-सीमाओं की समीक्षा करें।
                     </TooltipContent>
                   </Tooltip>
               </CardContent>
             </Card>
 
-            {/* Recent Chats (Placeholder) */}
+            {/* Recent Chats (Placeholder with Empty State) */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base md:text-lg">हाल की चर्चाएं</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Add dynamic recent chats later */}
-                 <p className="text-sm text-gray-500 italic text-center py-4">कोई हाल की चर्चा नहीं।</p>
+                 {/* --- Empty State for Recent Chats --- */}
+                 <div className="text-center py-4">
+                     <MessageSquare className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                     <p className="text-sm text-gray-500 italic">कोई हाल की चर्चा नहीं।</p>
+                 </div>
+                 {/* --- End Empty State --- */}
+                 {/* Add dynamic recent chats here later */}
               </CardContent>
             </Card>
           </div>
         </div>
       </TooltipProvider>
+      {/* --- End Sidebar --- */}
     </div>
   );
 }
@@ -393,8 +410,11 @@ function ChatComponent() {
 // Export default wrapper using Suspense for useSearchParams
 export default function ChatPage() {
     return (
-        <Suspense fallback={<div>Loading chat...</div>}> {/* Add a basic fallback */}
+        // Added Suspense wrapper for ChatComponent
+        <Suspense fallback={<div className="flex h-[calc(100vh-80px)] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>}>
             <ChatComponent />
         </Suspense>
     );
 }
+
+// Ensure no other function definitions (like AccountSettingsPage) are below this line
