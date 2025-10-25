@@ -11,6 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 import shutil
+import difflib
 
 # Load environment variables
 load_dotenv()
@@ -118,6 +119,34 @@ async def ask_question(query: Query):
             for doc in result["source_documents"]
         ],
     }
+
+# Function to extract text (adapt from your upload logic)
+async def extract_text_from_upload(file: UploadFile) -> str:
+    # Save temp file, use UnstructuredFileLoader, read content, delete temp file
+    # Placeholder implementation:
+    content_bytes = await file.read()
+    # In reality, use unstructured or other libs based on file type
+    try:
+        return content_bytes.decode('utf-8')
+    except UnicodeDecodeError:
+         # Fallback for non-text or different encoding - needs robust handling
+        return "[Could not decode file content]"
+
+
+@app.post("/compare/")
+async def compare_documents(file1: UploadFile = File(...), file2: UploadFile = File(...)):
+    text1 = await extract_text_from_upload(file1)
+    text2 = await extract_text_from_upload(file2)
+
+    d = difflib.Differ()
+    # Or use unified_diff for a different format
+    diff = list(d.compare(text1.splitlines(), text2.splitlines()))
+
+    # Return diff in a format frontend can easily parse
+    # Example: list of changes with type (added, removed, same) and content
+    # Or just return the raw diff lines if using a diff library on frontend
+    return {"comparison": diff}
+
 
 
 @app.get("/verify/")
