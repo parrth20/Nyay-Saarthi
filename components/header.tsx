@@ -20,8 +20,9 @@
  import { useEffect, useState } from 'react';
  import { cn } from '@/lib/utils';
  import { toast } from 'sonner';
-
+import { GitCompareArrows } from 'lucide-react'; // Make sure GitCompareArrows is imported
  // Helper to get initials
+ 
  const getInitials = (name?: string, email?: string): string => {
     if (name) {
         const nameParts = name.split(' ').filter(Boolean);
@@ -45,13 +46,14 @@
    const [isLoggingOut, setIsLoggingOut] = useState(false);
    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
 
-   const navLinks = [
-     { href: '/dashboard', label: 'डैशबोर्ड', icon: BarChart3 },
-     { href: '/upload', label: 'अपलोड', icon: Upload },
-     { href: '/chat', label: 'AI चैट', icon: MessageSquare },
-     { href: '/consultation', label: 'परामर्श', icon: User }, // Keeping User icon for consultation link
-     { href: '/support', label: 'सहायता', icon: Phone },
-   ];
+const navLinks = [
+  { href: '/dashboard', label: 'डैशबोर्ड', icon: BarChart3 },
+  { href: '/upload', label: 'अपलोड', icon: Upload },
+  { href: '/compare', label: 'तुलना करें', icon: GitCompareArrows }, 
+  { href: '/chat', label: 'AI चैट', icon: MessageSquare },
+  { href: '/consultation', label: 'परामर्श', icon: User },
+  { href: '/support', label: 'सहायता', icon: Phone },
+];
 
    useEffect(() => {
      const supabase = createClient();
