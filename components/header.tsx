@@ -67,6 +67,7 @@
        setUser(session?.user ?? null);
      });
 
+     // Cleanup listener on component unmount
      return () => {
        authListener?.subscription.unsubscribe();
      };
@@ -87,8 +88,9 @@
      } catch (error) {
        console.error("Logout failed:", error);
        toast.error("Logout failed. Please try again.");
-       setIsLoggingOut(false);
+       setIsLoggingOut(false); // Reset loading state ONLY on error
      }
+     // No need to set isLoggingOut to false on success, as redirect happens
    };
 
    // Close mobile menu on navigation change
@@ -133,6 +135,7 @@
                    >
                      <link.icon className="h-4 w-4" />
                      <span>{link.label}</span>
+                     {/* Animated underline */}
                      <span className={cn(
                        "absolute bottom-0 left-0 h-0.5 bg-green-600 rounded-full transition-all duration-300 ease-out",
                        isActive(link.href) ? "w-full" : "w-0 group-hover:w-full"
@@ -155,8 +158,8 @@
                          )}
                          disabled={loading || isLoggingOut}
                        >
-                         {/* Button Content */}
-                         <span className="flex items-center gap-2"> {/* Inner span wrapper */}
+                         {/* Button Content Wrapped in Span */}
+                         <span className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                                <AvatarImage src={avatarUrl} alt={displayName} />
                                <AvatarFallback className="text-xs bg-green-100 text-green-700">
@@ -167,6 +170,7 @@
                          </span>
                        </DropdownMenuTrigger>
 
+                       {/* Dropdown Content */}
                        <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuLabel className="font-normal">
                              <div className="flex flex-col space-y-1">
@@ -206,7 +210,7 @@
                        </DropdownMenuContent>
                      </DropdownMenu>
                    ) : (
-                     // --- START Logged out state ---
+                     // Logged out state
                      <>
                        <Link href="/login">
                          <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 bg-transparent">
@@ -219,21 +223,19 @@
                          </Button>
                        </Link>
                      </>
-                     // --- END Logged out state ---
                    )}
                  </div>
                </nav>
 
-               {/* --- START Mobile Menu --- */}
+               {/* Mobile Menu */}
                <div className="md:hidden">
-                 {/* Control Sheet open state */}
                  <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                    <SheetTrigger asChild>
                      <Button size="icon" variant="ghost" disabled={loading}>
                        <Menu className="h-6 w-6" />
                      </Button>
                    </SheetTrigger>
-                   <SheetContent side="right" className="w-[280px] flex flex-col p-0"> {/* Remove default padding */}
+                   <SheetContent side="right" className="w-[280px] flex flex-col p-0">
                      {/* Header inside Sheet */}
                      <div className="p-4 border-b">
                        <Link href="/" className="flex items-center space-x-3" onClick={() => setIsMobileMenuOpen(false)}>
@@ -266,7 +268,7 @@
                       </div>
 
                        {/* Sticky Auth Area at Bottom */}
-                       <div className="border-t p-4 flex flex-col gap-3 mt-auto bg-white"> {/* Ensure background */}
+                       <div className="border-t p-4 flex flex-col gap-3 mt-auto bg-white">
                          {loading ? (
                            <div className="h-10 w-full bg-gray-200 rounded-md animate-pulse"></div>
                          ) : user ? (
@@ -304,7 +306,7 @@
                               </form>
                             </>
                          ) : (
-                           // --- START Logged out state for Mobile ---
+                           // Logged out state for Mobile
                            <>
                              <Link href="/login" className="w-full">
                                <Button variant="outline" className="w-full border-green-600 text-green-600" onClick={() => setIsMobileMenuOpen(false)}>लॉग इन करें</Button>
@@ -313,7 +315,6 @@
                                <Button className="w-full !bg-green-600 hover:!bg-green-700 text-white" onClick={() => setIsMobileMenuOpen(false)}>अभी शुरू करें</Button>
                              </Link>
                            </>
-                           // --- END Logged out state for Mobile ---
                          )}
                        </div>
                    </SheetContent>

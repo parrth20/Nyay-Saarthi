@@ -1,14 +1,15 @@
 // app/chat/page.tsx
 "use client";
 
-import { useState, useRef, useEffect, Suspense } from "react"; // Added Suspense
-import { useSearchParams } from 'next/navigation'; // Import useSearchParams
+import { useState, useRef, useEffect, Suspense, useCallback } from "react"; // Added useCallback
+import { useSearchParams, useRouter } from 'next/navigation'; // Import useRouter
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react"; // Make sure Loader2 is imported if used in Suspense fallback
-import { Send, Bot, User, FileText, Clock, AlertTriangle, Lightbulb, MessageSquare, BookOpen, ChevronDown } from "lucide-react"; // Added BookOpen, ChevronDown
+import { Loader2 } from "lucide-react"; 
+import { cn } from "@/lib/utils";
+import { Send, Bot, User, FileText, Clock, AlertTriangle, Lightbulb, MessageSquare, BookOpen, ChevronDown, Copy, Check, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react"; // Added Copy, Check, Thumbs icons, Trash2
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     Tooltip,
@@ -21,6 +22,10 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible"; // Import Collapsible
+import { toast } from "sonner"; // Import toast for copy feedback
+
+// --- Constants ---
+const LOCALSTORAGE_CONTEXT_KEY = 'nyaySaarthi_chatContextFile';
 
 interface Message {
   id: number | string; // Allow string IDs for potential future use
@@ -34,31 +39,76 @@ interface Message {
 // Wrap the main component logic in a new component to use Suspense
 function ChatComponent() {
   const searchParams = useSearchParams();
-  const contextFileName = searchParams.get('contextFile'); // Get filename from URL
+  const router = useRouter(); // Initialize useRouter if needed for other actions
+  const urlContextFile = searchParams.get('contextFile');
+  const [contextFileName, setContextFileName] = useState<string | null>(null);
 
-  const initialMessages: Message[] = [
-    {
-      id: 1,
-      content: "नमस्ते! मैं आपका AI कानूनी सहायक हूँ। आपके दस्तावेज़ों के बारे में कोई भी प्रश्न पूछें।",
-      sender: "ai",
-      timestamp: new Date(),
-      type: "text",
-    },
-    // Add context message if filename exists in URL
-    ...(contextFileName ? [{
-      id: 'context-info', // Use a specific string ID
-      content: `फ़ाइल "${decodeURIComponent(contextFileName)}" के संदर्भ में पूछ रहे हैं।`,
-      sender: "ai" as const, // Ensure sender type is correct
-      timestamp: new Date(),
-      type: "context-info" as const, // New type for context info
-    }] : [])
-  ];
+  // State for copy button feedback
+  const [copiedMessageId, setCopiedMessageId] = useState<string | number | null>(null);
 
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  // --- Context Persistence Logic ---
+  useEffect(() => {
+    let initialContext: string | null = null;
+    // 1. Prioritize URL parameter
+    if (urlContextFile) {
+      initialContext = decodeURIComponent(urlContextFile);
+      // Store it in localStorage for persistence
+      try {
+        localStorage.setItem(LOCALSTORAGE_CONTEXT_KEY, initialContext);
+        console.log("Context set from URL:", initialContext); // Debug log
+      } catch (e) {
+        console.warn("localStorage not available or failed to set item.");
+      }
+    } else {
+      // 2. Fallback to localStorage if no URL param
+      try {
+        initialContext = localStorage.getItem(LOCALSTORAGE_CONTEXT_KEY);
+        console.log("Context read from localStorage:", initialContext); // Debug log
+      } catch (e) {
+        console.warn("localStorage not available or failed to get item.");
+      }
+    }
+    setContextFileName(initialContext);
+  }, [urlContextFile]); // Re-run only if URL parameter changes
+
+  // --- Initial Messages Logic ---
+  const getInitialMessages = useCallback((): Message[] => {
+    console.log("getInitialMessages called with context:", contextFileName); // Debug log
+    const baseMessages: Message[] = [
+      {
+        id: 1,
+        content: "नमस्ते! मैं आपका AI कानूनी सहायक हूँ। आपके दस्तावेज़ों के बारे में कोई भी प्रश्न पूछें।",
+        sender: "ai",
+        timestamp: new Date(),
+        type: "text",
+      }
+    ];
+    if (contextFileName) { // Use state variable here
+      return [
+        ...baseMessages,
+        {
+          id: 'context-info',
+          content: `फ़ाइल "${contextFileName}" के संदर्भ में पूछ रहे हैं।`,
+          sender: "ai" as const,
+          timestamp: new Date(),
+          type: "context-info" as const,
+        }
+      ];
+    }
+    return baseMessages;
+  }, [contextFileName]); // Re-run when contextFileName changes
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Set initial messages once context is determined and changes
+  useEffect(() => {
+    setMessages(getInitialMessages());
+  }, [getInitialMessages]); // Dependency on the memoized function
+
+  // --- Other Functions (scrollToBottom, handleSendMessage, etc.) ---
   const suggestedQuestions = ["मुख्य जोखिम क्या है?", "समय सीमा कब तक है?", "भुगतान की शर्तें क्या हैं?"];
 
   const scrollToBottom = () => {
@@ -91,7 +141,9 @@ function ChatComponent() {
       const requestBody = {
         question: currentInput,
         // contextId: backendFileId // Example if you stored an ID
+        // contextFileName: contextFileName // Send filename if backend expects it
       };
+      console.log("Sending to API:", requestBody); // Debug log
 
       const response = await fetch("https://parrth020-nyay-saarthi-ai-agent.hf.space/ask/", {
         method: "POST",
@@ -101,11 +153,16 @@ function ChatComponent() {
         body: JSON.stringify(requestBody),
       });
 
+      console.log("API Response Status:", response.status); // Debug log
+
       if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText} (${response.status})`);
+        const errorText = await response.text();
+        console.error("API Error Response:", errorText); // Debug log
+        throw new Error(`API Error: ${response.statusText} (${response.status}) - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log("API Response Data:", data); // Debug log
 
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(), // Unique ID
@@ -115,13 +172,14 @@ function ChatComponent() {
         type: "text",
         sources: data.sources?.map((s: any) => ({ // Safely map sources
             content: s.content || "N/A",
-            page: s.page || s.metadata?.page_number || "N/A" // Adapt based on actual backend response
+            // Adapt based on actual backend response structure for page number
+            page: s.page ?? s.metadata?.page_number ?? "N/A"
         })) || [],
       };
       setMessages((prev) => [...prev, aiResponse]);
 
     } catch (error: any) {
-      console.error("API Error:", error); // Log the error
+      console.error("API Fetch Error:", error); // Log the error
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(), // Unique ID
         content: `क्षमा करें, मुझे एक त्रुटि आई (${error.message || 'Unknown error'}). कृपया पुनः प्रयास करें।`,
@@ -137,8 +195,8 @@ function ChatComponent() {
 
   const handleSuggestedQuestion = (question: string) => {
     setInputMessage(question);
-    // Optionally trigger send directly:
-    // handleSendMessage(); // Uncomment if you want clicking a suggestion to send immediately
+    // Optionally trigger send directly by uncommenting the line below
+    // handleSendMessage();
   };
 
   const formatTime = (date: Date) => {
@@ -148,81 +206,178 @@ function ChatComponent() {
       hour12: true,
     });
   };
+  // --- End Functions ---
 
+  // --- Copy Function ---
+  const handleCopy = (content: string, messageId: string | number) => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopiedMessageId(messageId);
+      toast.success("Message copied to clipboard!");
+      setTimeout(() => setCopiedMessageId(null), 1500); // Reset icon after 1.5s
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+      toast.error("Failed to copy message.");
+    });
+  };
+
+  // --- Clear Chat Function ---
+  const handleClearChat = () => {
+    // Optional: Clear context from localStorage too
+     try {
+         localStorage.removeItem(LOCALSTORAGE_CONTEXT_KEY);
+         console.log("Cleared context from localStorage"); // Debug log
+     } catch (e) {
+         console.warn("localStorage not available or failed to remove item.");
+     }
+     setContextFileName(null); // Clear context state immediately
+    // Reset messages based on the now-cleared context
+    setMessages(getInitialMessages());
+    toast.info("Chat history and context cleared.");
+  };
+
+  // --- Placeholder Feedback Function ---
+  const handleFeedback = (messageId: string | number, feedback: 'good' | 'bad') => {
+      console.log(`Feedback for message ${messageId}: ${feedback}`);
+      toast.info("धन्यवाद! आपका फ़ीडबैक दर्ज कर लिया गया है।"); // Simple feedback
+      // Here you would typically send this feedback to your backend API
+  };
+
+  // --- JSX ---
   return (
-    <div className="flex h-[calc(100vh-80px)]"> {/* Adjusted height calculation */}
+    <div className="flex h-[calc(100vh-80px)]"> {/* Main container */}
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-green-50 via-blue-50 to-purple-50"> {/* Added background */}
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-green-50 via-blue-50 to-purple-50">
         {/* Page Title */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">AI सहायक से पूछें</h1>
-              <p className="text-gray-600 text-sm"> {/* Smaller text */}
+        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-grow min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate">AI सहायक से पूछें</h1>
+              <p className="text-gray-600 text-xs md:text-sm truncate">
                 {contextFileName
-                  ? `"${decodeURIComponent(contextFileName)}" के बारे में प्रश्न पूछें`
+                  ? `"${contextFileName}" के बारे में प्रश्न पूछें`
                   : "अपने दस्तावेज़ों के बारे में प्रश्न पूछें"}
               </p>
             </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              <Bot className="h-4 w-4 mr-1" />
-              ऑनलाइन
-            </Badge>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Clear Chat Button */}
+               <Tooltip>
+                   <TooltipTrigger asChild>
+                       <Button variant="ghost" size="icon" onClick={handleClearChat} className="text-gray-500 hover:text-red-600 h-8 w-8">
+                           <Trash2 className="h-4 w-4" />
+                       </Button>
+                   </TooltipTrigger>
+                   <TooltipContent side="bottom" className="text-xs">
+                       Clear Chat & Context
+                   </TooltipContent>
+               </Tooltip>
+
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                <Bot className="h-4 w-4 mr-1" />
+                ऑनलाइन
+              </Badge>
+            </div>
           </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
           {messages.map((message) => (
             <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`flex items-start gap-3 max-w-xl md:max-w-2xl ${message.sender === "user" ? "flex-row-reverse" : ""}`} // Adjusted max-width
-              >
-                <Avatar className="h-8 w-8 flex-shrink-0"> {/* Added flex-shrink-0 */}
-                  <AvatarFallback
-                    className={
-                      message.sender === "user" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
-                    }
-                  >
+              <div className={`flex items-start gap-3 max-w-xl md:max-w-2xl ${message.sender === "user" ? "flex-row-reverse" : ""}`}>
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarFallback className={cn(
+                    "flex items-center justify-center rounded-full", // Base styles
+                    message.sender === "user" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
+                  )}>
                     {message.sender === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                   </AvatarFallback>
                 </Avatar>
-                <div
-                  className={`rounded-lg p-3 md:p-4 shadow-sm ${ // Added shadow, adjusted padding
-                    message.sender === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-800"
-                  } ${message.type === 'context-info' ? 'bg-amber-50 border-amber-200 text-amber-800 italic' : ''}`} // Context info style
-                >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p> {/* Added whitespace-pre-wrap */}
+                {/* Message Bubble Group */}
+                <div className="group relative"> {/* Add group relative for positioning buttons */}
+                  <div className={cn(
+                    "rounded-lg p-3 md:p-4 shadow-sm",
+                    message.sender === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-800",
+                    message.type === 'context-info' ? 'bg-amber-50 border-amber-200 text-amber-800 italic' : ''
+                  )}>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
 
-                  {/* Collapsible Sources Section */}
-                  {message.sender === "ai" && message.sources && message.sources.length > 0 && (
-                    <Collapsible className="mt-3">
-                      <CollapsibleTrigger asChild>
-                         <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 data-[state=open]:text-gray-700"> {/* Added open state style */}
-                            <BookOpen className="h-3 w-3 mr-1"/> {/* Added icon */}
-                            स्रोत देखें ({message.sources.length})
-                           <ChevronDown className="h-3 w-3 ml-1 transition-transform duration-200 data-[state=open]:rotate-180" /> {/* Added duration */}
-                         </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-2 space-y-2 animate-accordion-down overflow-hidden"> {/* Added overflow-hidden */}
-                        <div className="border-l-2 border-gray-300 pl-3 space-y-2"> {/* Added indent and spacing */}
-                            {message.sources.map((source, index) => (
-                              <div key={index} className="p-2 bg-gray-50 rounded border border-gray-200 text-xs text-gray-700">
-                                <p className="line-clamp-3 mb-1 italic">"{source.content}"</p> {/* Show snippet */}
-                                <p className="font-medium">पृष्ठ: {source.page}</p>
-                              </div>
-                            ))}
+                    {/* Collapsible Sources Section */}
+                    {message.sender === "ai" && message.sources && message.sources.length > 0 && (
+                      <Collapsible className="mt-3">
+                        <CollapsibleTrigger asChild>
+                           <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 data-[state=open]:text-gray-700">
+                              <BookOpen className="h-3 w-3 mr-1"/>
+                              स्रोत देखें ({message.sources.length})
+                             <ChevronDown className="h-3 w-3 ml-1 transition-transform duration-200 data-[state=open]:rotate-180" />
+                           </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-2 space-y-2 animate-accordion-down overflow-hidden">
+                          <div className="border-l-2 border-gray-300 pl-3 space-y-2">
+                              {message.sources.map((source, index) => (
+                                <div key={index} className="p-2 bg-gray-50 rounded border border-gray-200 text-xs text-gray-700">
+                                  <p className="line-clamp-3 mb-1 italic">"{source.content}"</p>
+                                  <p className="font-medium">पृष्ठ: {source.page}</p>
+                                </div>
+                              ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+
+                    {/* Timestamp & Action Buttons (only for AI text messages) */}
+                    {message.sender === 'ai' && message.type === 'text' && (
+                        <div className="flex justify-end items-center gap-1 mt-2 pt-1 border-t border-gray-200/50"> {/* Reduced gap */}
+                            {/* Feedback Buttons */}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-green-600" onClick={() => handleFeedback(message.id, 'good')}>
+                                        <ThumbsUp className="h-3.5 w-3.5"/>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">अच्छा जवाब</TooltipContent>
+                            </Tooltip>
+                             <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-red-600" onClick={() => handleFeedback(message.id, 'bad')}>
+                                        <ThumbsDown className="h-3.5 w-3.5"/>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">खराब जवाब</TooltipContent>
+                            </Tooltip>
+
+                            {/* Copy Button */}
+                            <Tooltip>
+                               <TooltipTrigger asChild>
+                                   <Button
+                                       variant="ghost"
+                                       size="icon"
+                                       className="h-6 w-6 text-gray-400 hover:text-blue-600"
+                                       onClick={() => handleCopy(message.content, message.id)}
+                                   >
+                                       {copiedMessageId === message.id ? <Check className="h-3.5 w-3.5 text-green-600"/> : <Copy className="h-3.5 w-3.5"/>}
+                                   </Button>
+                               </TooltipTrigger>
+                               <TooltipContent side="bottom" className="text-xs">Copy</TooltipContent>
+                             </Tooltip>
+                              {/* Timestamp */}
+                             <p className="text-xs text-gray-400 ml-auto pl-2">
+                                {formatTime(message.timestamp)}
+                              </p>
                         </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  )}
-
-                  {/* Timestamp (only for non-context messages) */}
-                  {message.type !== 'context-info' && (
-                     <p className={`text-xs mt-2 text-right ${message.sender === "user" ? "text-blue-100 opacity-80" : "text-gray-400"}`}>
-                        {formatTime(message.timestamp)}
-                      </p>
-                  )}
+                    )}
+                    {/* Timestamp for User messages */}
+                     {message.sender === 'user' && (
+                         <p className={`text-xs mt-2 text-right text-blue-100 opacity-80`}>
+                            {formatTime(message.timestamp)}
+                          </p>
+                     )}
+                     {/* Timestamp for AI Context message */}
+                     {message.type === 'context-info' && (
+                         <p className={`text-xs mt-2 text-right text-amber-600 opacity-80`}>
+                            {formatTime(message.timestamp)}
+                          </p>
+                     )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -315,11 +470,11 @@ function ChatComponent() {
                    <Tooltip>
                       <TooltipTrigger asChild>
                         <p className="text-sm text-gray-600 truncate cursor-help">
-                            फ़ाइल: {decodeURIComponent(contextFileName)}
+                            फ़ाइल: {contextFileName} {/* No need to decode here if already decoded */}
                         </p>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" align="start">
-                        {decodeURIComponent(contextFileName)}
+                        {contextFileName} {/* Show full name on hover */}
                       </TooltipContent>
                    </Tooltip>
                  ) : (
@@ -338,7 +493,6 @@ function ChatComponent() {
               <CardContent className="space-y-3">
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        {/* Make button trigger an action or link */}
                         <Button variant="outline" className="w-full justify-start bg-transparent font-normal text-sm" onClick={() => alert('Start Document Analysis...')}>
                           <FileText className="h-4 w-4 mr-2" />
                           दस्तावेज़ विश्लेषण
@@ -417,4 +571,4 @@ export default function ChatPage() {
     );
 }
 
-// Ensure no other function definitions (like AccountSettingsPage) are below this line
+// NO DUPLICATED AccountSettingsPage function should be below this line

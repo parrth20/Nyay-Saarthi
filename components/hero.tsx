@@ -1,43 +1,45 @@
 // components/hero.tsx
-"use client"
+"use client";
 
-import type React from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card" // Only Card needed, not specific parts like CardContent
-import { Upload, FileText, CheckCircle, Shield, Sparkles, Users, Award } from "lucide-react"
-import { useState, useEffect, useCallback } from "react" // Import useCallback
-import Link from "next/link"
+import type React from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Upload, FileText, CheckCircle, Shield, Sparkles, Users, Award } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+// Optional: import { useRouter } from 'next/navigation'; if you want drop to redirect
 
 export function Hero() {
-  const [dragActive, setDragActive] = useState(false)
-  const [isVisible, setIsVisible] = useState(false)
+  const [dragActive, setDragActive] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  // Optional: const router = useRouter();
 
   useEffect(() => {
-    setIsVisible(true)
-  }, [])
+    setIsVisible(true);
+  }, []);
 
   // Combined drag handler using useCallback
   const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
     if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
+      setDragActive(true);
     } else if (e.type === "dragleave") {
-      setDragActive(false)
+      setDragActive(false);
     }
   }, []);
 
   // Drop handler using useCallback
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
     // Handle file upload logic here if needed directly (e.g., redirecting with files)
     // For now, it just deactivates the drag state.
     // Consider redirecting to /upload or using a shared state/context.
     console.log("Files dropped on hero:", e.dataTransfer.files);
-    // Example redirection (if you want dropping here to start upload):
-    // router.push('/upload'); // Requires importing useRouter
+    // Example redirection:
+    // router.push('/upload');
   }, []); // Add dependencies if needed, e.g. [router]
 
 
@@ -195,5 +197,5 @@ export function Hero() {
         </div>
       </div>
     </section>
-  )
+  );
 }
