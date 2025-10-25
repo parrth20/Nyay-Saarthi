@@ -1,67 +1,109 @@
 // components/header.tsx
-"use client"; // Add this line because we need the usePathname hook
+"use client";
 
  import Link from 'next/link';
- import { usePathname } from 'next/navigation'; // Import usePathname
- import { Button } from '@/components/ui/button';
+ import { usePathname } from 'next/navigation';
+ import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
  import {
    DropdownMenu,
    DropdownMenuContent,
    DropdownMenuItem,
+   DropdownMenuLabel,
    DropdownMenuSeparator,
    DropdownMenuTrigger,
  } from '@/components/ui/dropdown-menu';
  import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
- import { Menu, Scale, User, LogOut, BarChart3, MessageSquare, Phone, Upload } from 'lucide-react'; // Added Upload icon
- import { createClient } from '@/utils/supabase/client'; // Use client for hooks
- import { signOut } from '@/lib/actions'; // Keep server action for sign out
- import { useEffect, useState } from 'react'; // Import useEffect and useState for user state
- import { cn } from '@/lib/utils'; // Import cn for conditional classes
+ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+ import { Menu, Scale, User, LogOut, BarChart3, MessageSquare, Phone, Upload, Loader2, Settings } from 'lucide-react';
+ import { createClient } from '@/utils/supabase/client';
+ import { signOut } from '@/lib/actions'; // Make sure this path points to your file with "use server"
+ import { useEffect, useState } from 'react';
+ import { cn } from '@/lib/utils';
+ import { toast } from 'sonner';
+
+ // Helper to get initials
+ const getInitials = (name?: string, email?: string): string => {
+    if (name) {
+        const nameParts = name.split(' ').filter(Boolean);
+        if (nameParts.length > 1) {
+            return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+        } else if (nameParts.length === 1 && nameParts[0].length > 0) {
+            return nameParts[0][0].toUpperCase();
+        }
+    }
+    if (email) {
+        return email[0].toUpperCase();
+    }
+    return '?'; // Default fallback
+ };
+
 
  export function Header() {
-   const pathname = usePathname(); // Get the current path
-   const [user, setUser] = useState<any>(null); // State to hold user data
-   const [loading, setLoading] = useState(true); // State for loading user data
+   const pathname = usePathname();
+   const [user, setUser] = useState<any>(null);
+   const [loading, setLoading] = useState(true);
+   const [isLoggingOut, setIsLoggingOut] = useState(false);
+   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
 
-   // Define nav links here for easier mapping
    const navLinks = [
      { href: '/dashboard', label: 'डैशबोर्ड', icon: BarChart3 },
-     { href: '/upload', label: 'अपलोड', icon: Upload }, // Added Upload link
+     { href: '/upload', label: 'अपलोड', icon: Upload },
      { href: '/chat', label: 'AI चैट', icon: MessageSquare },
-     { href: '/consultation', label: 'परामर्श', icon: User }, // Assuming User icon is for consultation
+     { href: '/consultation', label: 'परामर्श', icon: User }, // Keeping User icon for consultation link
      { href: '/support', label: 'सहायता', icon: Phone },
    ];
 
-   // Fetch user on client side since this is now a client component
    useEffect(() => {
      const supabase = createClient();
      const getUser = async () => {
-       setLoading(true); // Start loading
+       setLoading(true);
        const { data: { user: currentUser } } = await supabase.auth.getUser();
        setUser(currentUser);
-       setLoading(false); // Finish loading
+       setLoading(false);
      };
      getUser();
 
-     // Listen for auth changes to update UI immediately
      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
        setUser(session?.user ?? null);
-       // Optional: Add logic here if you need to react to specific events like SIGNED_IN
      });
 
-     // Cleanup listener on component unmount
      return () => {
        authListener?.subscription.unsubscribe();
      };
    }, []);
 
 
-   // Function to check if a link is active
    const isActive = (href: string) => {
      // Handle exact match for home page if needed, otherwise use startsWith
-     // If you add a link for '/', use: if (href === '/') return pathname === '/';
      return pathname === href || (href !== '/' && pathname.startsWith(href));
    };
+
+   // Function to handle logout directly
+   const handleLogoutDirect = async () => {
+     setIsLoggingOut(true);
+     try {
+       await signOut();
+       // Redirect is handled by the server action
+     } catch (error) {
+       console.error("Logout failed:", error);
+       toast.error("Logout failed. Please try again.");
+       setIsLoggingOut(false);
+     }
+   };
+
+   // Close mobile menu on navigation change
+   useEffect(() => {
+     setIsMobileMenuOpen(false);
+   }, [pathname]);
+
+
+   // --- Get User Display Info ---
+   const userName = user?.user_metadata?.name || user?.user_metadata?.full_name;
+   const userEmail = user?.email;
+   const avatarUrl = user?.user_metadata?.avatar_url;
+   const userInitials = getInitials(userName, userEmail);
+   const displayName = userName || userEmail?.split('@')[0] || 'Account';
+   // ---
 
    return (
          <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-green-100">
@@ -84,21 +126,16 @@
                    <Link
                      key={link.href}
                      href={link.href}
-                     // Apply conditional classes using cn utility
                      className={cn(
-                       "flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors font-medium relative py-1 group", // Added group for underline animation
-                       // Style for active link with animated underline
-                       isActive(link.href)
-                         ? "text-green-700 font-semibold" // Make active link bold
-                         : ""
+                       "flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors font-medium relative py-1 group",
+                       isActive(link.href) ? "text-green-700 font-semibold" : ""
                      )}
                    >
                      <link.icon className="h-4 w-4" />
                      <span>{link.label}</span>
-                     {/* Animated underline */}
                      <span className={cn(
                        "absolute bottom-0 left-0 h-0.5 bg-green-600 rounded-full transition-all duration-300 ease-out",
-                       isActive(link.href) ? "w-full" : "w-0 group-hover:w-full" // Expand on hover or if active
+                       isActive(link.href) ? "w-full" : "w-0 group-hover:w-full"
                      )}></span>
                    </Link>
                  ))}
@@ -106,38 +143,70 @@
                  {/* Auth Buttons/Dropdown */}
                  <div className="flex items-center gap-2">
                    {loading ? (
-                     // Skeleton placeholder while loading user state
                      <div className="h-9 w-28 bg-gray-200 rounded-md animate-pulse"></div>
                    ) : user ? (
-                     <DropdownMenu>
-                       <DropdownMenuTrigger asChild>
-                         <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 bg-transparent">
-                           <User className="h-4 w-4 mr-2" />
-                           {/* Display name if available, otherwise email part */}
-                           {user.user_metadata?.name || user.email?.split('@')[0]}
-                         </Button>
+                     <DropdownMenu onOpenChange={(open) => console.log('Dropdown open state changed:', open)}>
+                       {/* Trigger IS the button, styles applied directly */}
+                       <DropdownMenuTrigger
+                         className={cn(
+                             buttonVariants({ variant: "outline" }), // Base button styles
+                             "border-green-600 text-green-600 hover:bg-green-50 bg-transparent", // Specific overrides
+                             "disabled:opacity-50 flex items-center gap-2 px-3 h-9 py-2" // Layout & Disabled styles
+                         )}
+                         disabled={loading || isLoggingOut}
+                       >
+                         {/* Button Content */}
+                         <span className="flex items-center gap-2"> {/* Inner span wrapper */}
+                            <Avatar className="h-6 w-6">
+                               <AvatarImage src={avatarUrl} alt={displayName} />
+                               <AvatarFallback className="text-xs bg-green-100 text-green-700">
+                                 {userInitials}
+                               </AvatarFallback>
+                             </Avatar>
+                            <span className="truncate max-w-[100px]">{displayName}</span>
+                         </span>
                        </DropdownMenuTrigger>
-                       <DropdownMenuContent align="end" className="w-48">
-                         <DropdownMenuItem asChild>
-                           <Link href="/dashboard" className="flex items-center cursor-pointer">
-                             <BarChart3 className="h-4 w-4 mr-2" />
-                             डैशबोर्ड
-                           </Link>
-                         </DropdownMenuItem>
-                         <DropdownMenuSeparator />
-                         {/* Sign Out Form - Still uses Server Action */}
-                         <form action={signOut} className="w-full">
-                           <button type="submit" className="w-full text-left">
-                             <DropdownMenuItem className="text-red-600 focus:text-red-600 w-full cursor-pointer">
-                               <LogOut className="h-4 w-4 mr-2" />
-                               लॉग आउट
-                             </DropdownMenuItem>
-                           </button>
-                         </form>
+
+                       <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel className="font-normal">
+                             <div className="flex flex-col space-y-1">
+                               <p className="text-sm font-medium leading-none truncate">{userName || 'User'}</p>
+                               <p className="text-xs leading-none text-muted-foreground truncate">
+                                 {userEmail}
+                               </p>
+                             </div>
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild>
+                            <Link href="/dashboard" className="flex items-center cursor-pointer">
+                              <BarChart3 className="h-4 w-4 mr-2" />
+                              डैशबोर्ड
+                            </Link>
+                          </DropdownMenuItem>
+                          {/* Enabled Account Settings Link */}
+                          <DropdownMenuItem asChild>
+                            <Link href="/account-settings" className="flex items-center cursor-pointer">
+                              <Settings className="h-4 w-4 mr-2" />
+                              Account Settings
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {/* Logout Item */}
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 w-full cursor-pointer focus:bg-red-50 disabled:opacity-50"
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              handleLogoutDirect();
+                            }}
+                            disabled={isLoggingOut}
+                          >
+                            {isLoggingOut ? ( <Loader2 className="h-4 w-4 mr-2 animate-spin" /> ) : ( <LogOut className="h-4 w-4 mr-2" /> )}
+                            {isLoggingOut ? "Logging out..." : "लॉग आउट"}
+                          </DropdownMenuItem>
                        </DropdownMenuContent>
                      </DropdownMenu>
                    ) : (
-                     // Logged out state
+                     // --- START Logged out state ---
                      <>
                        <Link href="/login">
                          <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 bg-transparent">
@@ -150,66 +219,108 @@
                          </Button>
                        </Link>
                      </>
+                     // --- END Logged out state ---
                    )}
                  </div>
                </nav>
 
-               {/* Mobile Menu */}
+               {/* --- START Mobile Menu --- */}
                <div className="md:hidden">
-                 <Sheet>
+                 {/* Control Sheet open state */}
+                 <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                    <SheetTrigger asChild>
-                     <Button size="icon" variant="ghost">
+                     <Button size="icon" variant="ghost" disabled={loading}>
                        <Menu className="h-6 w-6" />
                      </Button>
                    </SheetTrigger>
-                   <SheetContent side="right" className="w-[280px]">
-                     <div className="flex flex-col gap-4 py-6">
-                        {navLinks.map(link => (
-                           <Link
-                             key={link.href}
-                             href={link.href}
-                             className={cn(
-                               "flex items-center gap-3 rounded-md px-3 py-2 text-base text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors font-medium",
-                               // Active state for mobile
-                               isActive(link.href) ? "bg-green-100 text-green-800 font-semibold" : ""
-                             )}
-                           >
-                             <link.icon className="h-5 w-5" />
-                             {link.label}
-                           </Link>
-                         ))}
-                         <div className="border-t pt-4 mt-4 flex flex-col gap-3">
-                           {loading ? (
-                             <div className="h-10 w-full bg-gray-200 rounded-md animate-pulse"></div>
-                           ) : user ? (
-                              <>
-                                <div className="px-3 py-2 text-sm text-gray-500">
-                                   Signed in as {user.user_metadata?.name || user.email}
-                                </div>
-                                {/* Sign Out Form for Mobile */}
-                                <form action={signOut} className="w-full">
-                                  <Button type="submit" variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700">
-                                     <LogOut className="h-4 w-4 mr-2" />
-                                     लॉग आउट
-                                  </Button>
-                                </form>
-                              </>
-                           ) : (
-                             // Logged out state for Mobile
-                             <>
-                               <Link href="/login" className="w-full">
-                                 <Button variant="outline" className="w-full border-green-600 text-green-600">लॉग इन करें</Button>
-                               </Link>
-                               <Link href="/register" className="w-full">
-                                 <Button className="w-full !bg-green-600 hover:!bg-green-700 text-white">अभी शुरू करें</Button>
-                               </Link>
-                             </>
-                           )}
+                   <SheetContent side="right" className="w-[280px] flex flex-col p-0"> {/* Remove default padding */}
+                     {/* Header inside Sheet */}
+                     <div className="p-4 border-b">
+                       <Link href="/" className="flex items-center space-x-3" onClick={() => setIsMobileMenuOpen(false)}>
+                         <div className="bg-gradient-to-br from-green-600 to-green-700 p-2 rounded-xl shadow-lg">
+                           <Scale className="h-6 w-6 text-white" />
                          </div>
+                         <div>
+                            <h1 className="text-lg font-bold text-gray-900">कानूनी सहायक</h1>
+                            <p className="text-xs text-green-600 font-medium">Legal Helper AI</p>
+                         </div>
+                       </Link>
                      </div>
+
+                      {/* Scrollable Nav Area */}
+                      <div className="flex-grow overflow-y-auto p-4 space-y-3">
+                          {navLinks.map(link => (
+                             <Link
+                               key={link.href}
+                               href={link.href}
+                               className={cn(
+                                 "flex items-center gap-3 rounded-md px-3 py-2 text-base text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors font-medium",
+                                 isActive(link.href) ? "bg-green-100 text-green-800 font-semibold" : ""
+                               )}
+                               onClick={() => setIsMobileMenuOpen(false)} // Close on click
+                             >
+                               <link.icon className="h-5 w-5" />
+                               {link.label}
+                             </Link>
+                           ))}
+                      </div>
+
+                       {/* Sticky Auth Area at Bottom */}
+                       <div className="border-t p-4 flex flex-col gap-3 mt-auto bg-white"> {/* Ensure background */}
+                         {loading ? (
+                           <div className="h-10 w-full bg-gray-200 rounded-md animate-pulse"></div>
+                         ) : user ? (
+                            <>
+                              {/* Mobile User Info */}
+                              <div className="flex items-center gap-3 px-1 py-2 border-b mb-2 pb-3">
+                                 <Avatar className="h-9 w-9">
+                                    <AvatarImage src={avatarUrl} alt={displayName} />
+                                    <AvatarFallback className="text-sm bg-green-100 text-green-700">
+                                      {userInitials}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col overflow-hidden">
+                                      <span className="text-sm font-medium truncate">{userName || 'User'}</span>
+                                      <span className="text-xs text-gray-500 truncate">{userEmail}</span>
+                                  </div>
+                              </div>
+                              {/* Enabled Mobile Account Settings Button */}
+                              <Link href="/account-settings" className="w-full" onClick={() => setIsMobileMenuOpen(false)}>
+                                <Button variant="ghost" className="w-full justify-start text-gray-700 hover:bg-gray-100">
+                                    <Settings className="h-4 w-4 mr-2" />
+                                    Account Settings
+                                </Button>
+                              </Link>
+                              {/* Mobile Logout Form */}
+                              <form action={signOut} className="w-full">
+                                <Button type="submit" variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700" disabled={isLoggingOut}>
+                                  {isLoggingOut ? (
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                      <LogOut className="h-4 w-4 mr-2" />
+                                  )}
+                                   {isLoggingOut ? "Logging out..." : "लॉग आउट"}
+                                </Button>
+                              </form>
+                            </>
+                         ) : (
+                           // --- START Logged out state for Mobile ---
+                           <>
+                             <Link href="/login" className="w-full">
+                               <Button variant="outline" className="w-full border-green-600 text-green-600" onClick={() => setIsMobileMenuOpen(false)}>लॉग इन करें</Button>
+                             </Link>
+                             <Link href="/register" className="w-full">
+                               <Button className="w-full !bg-green-600 hover:!bg-green-700 text-white" onClick={() => setIsMobileMenuOpen(false)}>अभी शुरू करें</Button>
+                             </Link>
+                           </>
+                           // --- END Logged out state for Mobile ---
+                         )}
+                       </div>
                    </SheetContent>
                  </Sheet>
                </div>
+               {/* --- END Mobile Menu --- */}
+
              </div>
            </div>
          </header>
