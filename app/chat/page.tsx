@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react"; 
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Send, Bot, User, FileText, Clock, AlertTriangle, Lightbulb, MessageSquare, BookOpen, ChevronDown, Copy, Check, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react"; // Added Copy, Check, Thumbs icons, Trash2
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -23,6 +23,7 @@ import {
     CollapsibleTrigger,
 } from "@/components/ui/collapsible"; // Import Collapsible
 import { toast } from "sonner"; // Import toast for copy feedback
+import { createClient } from "@/utils/supabase/client"; // Import Supabase client
 
 // --- Constants ---
 const LOCALSTORAGE_CONTEXT_KEY = 'nyaySaarthi_chatContextFile';
@@ -45,6 +46,7 @@ function ChatComponent() {
 
   // State for copy button feedback
   const [copiedMessageId, setCopiedMessageId] = useState<string | number | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null); // State for current user
 
   // --- Context Persistence Logic ---
   useEffect(() => {
@@ -119,6 +121,48 @@ function ChatComponent() {
     scrollToBottom();
   }, [messages]);
 
+  // --- Fetch Current User ---
+  useEffect(() => {
+    const supabase = createClient(); // Client-side client
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+      console.log("Fetched user client-side:", user); // Debug log
+    };
+    fetchUser();
+  }, []);
+  // --- End Fetch Current User ---
+
+  // --- Save Last Message to Supabase ---
+  const saveLastMessageToSupabase = async (messageContent: string) => {
+      if (!currentUser) {
+          console.warn("No user logged in, cannot save chat.");
+          return; // Don't try to save if no user
+      }
+
+      const supabase = createClient();
+      console.log(`Attempting to save for user ${currentUser.id}: "${messageContent}"`); // Debug log
+
+      const { data, error } = await supabase
+          .from('chats') // Your table name
+          .upsert({
+              user_id: currentUser.id, // The user's UUID
+              last_message: messageContent, // The content of the last AI/error message
+              updated_at: new Date().toISOString(), // Ensure timestamp is updated
+          })
+          .select(); // Optional: select to confirm/debug
+
+      if (error) {
+          console.error("Error saving chat to Supabase:", error);
+          // Optional: Show a subtle error to the user if needed, but avoid spamming
+          // toast.error("Failed to sync chat history.");
+      } else {
+          console.log("Chat saved/updated in Supabase:", data);
+      }
+  };
+  // --- End Save Last Message Function ---
+
+
   // Handle message sending (API call)
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
@@ -178,6 +222,11 @@ function ChatComponent() {
       };
       setMessages((prev) => [...prev, aiResponse]);
 
+      // --- ADD THIS CALL ---
+      saveLastMessageToSupabase(aiResponse.content); // Save successful AI response
+      // --- END ADDITION ---
+
+
     } catch (error: any) {
       console.error("API Fetch Error:", error); // Log the error
       const errorResponse: Message = {
@@ -188,6 +237,11 @@ function ChatComponent() {
         type: "text",
       };
       setMessages((prev) => [...prev, errorResponse]);
+
+       // --- ADD THIS CALL ---
+       saveLastMessageToSupabase(errorResponse.content); // Save error response content
+       // --- END ADDITION ---
+
     } finally {
       setIsTyping(false);
     }
@@ -571,4 +625,3 @@ export default function ChatPage() {
     );
 }
 
-// NO DUPLICATED AccountSettingsPage function should be below this line

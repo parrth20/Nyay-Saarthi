@@ -1,4 +1,3 @@
-// app/upload/page.tsx
 "use client";
 
 import type React from "react";
@@ -8,38 +7,38 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, CheckCircle, X, AlertCircle, Loader2 } from "lucide-react";
-import { toast } from "sonner"; // Ensure toast is imported
+import { toast } from "sonner";
+import { createClient } from "@/utils/supabase/client"; // Import Supabase client
+import { cn } from "@/lib/utils"; // Import cn
 
 interface UploadedFile {
   file: File;
   id: string;
   progress: number;
-  status: "uploading" | "processing" | "complete" | "error";
+  status: "uploading" | "processing" | "saving" | "complete" | "error"; // Added 'saving' state
   result?: string;
   error?: string;
-  // backendFileId?: string; // Optional: Store backend identifier if returned
 }
 
 export default function UploadPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const router = useRouter();
+  const supabase = createClient(); // Initialize Supabase client
 
-  // Updated: Now pushes filename as query param
   const handleViewResult = (fileId: string) => {
     const file = uploadedFiles.find(f => f.id === fileId);
-    // Pass filename as a query parameter (example context)
-    // The chat page would need to read this using useSearchParams
     const queryParams = file ? `?contextFile=${encodeURIComponent(file.file.name)}` : '';
     router.push(`/chat${queryParams}`);
   };
 
-   // --- Extracted upload logic ---
+   // --- Extracted upload AND SAVE logic ---
    const uploadAndProcessFile = async (file: File, fileId: string) => {
     const formData = new FormData();
     formData.append("file", file);
 
-    const toastId = toast.loading("Processing document...", {
+    // --- Backend Processing ---
+    const processingToastId = toast.loading("Processing document...", {
       description: `Analyzing ${file.name}`
     });
 
@@ -50,46 +49,72 @@ export default function UploadPage() {
         mode: "cors",
       });
 
-      if (response.ok) {
-        const resultMessage = "File processed successfully!";
-        setUploadedFiles((prev) =>
-          prev.map((f) =>
-            f.id === fileId
-              ? {
-                  ...f,
-                  status: "complete",
-                  result: resultMessage,
-                  // backendFileId: backendInfo.fileId // Store backend ID if available
-                }
-              : f
-          )
-        );
-        toast.success("विश्लेषण पूर्ण हुआ!", {
-           id: toastId,
-           description: `${file.name} का सफलतापूर्वक विश्लेषण किया गया।`,
-           action: {
-             label: "परिणाम देखें",
-             onClick: () => handleViewResult(fileId), // Calls the updated function
-           },
-        });
-      } else {
+      if (!response.ok) {
+        // Handle backend processing error
         const errorText = await response.text();
-        const errorMessage = `Processing failed: ${response.statusText} (${response.status})`;
-        setUploadedFiles((prev) =>
-          prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: errorMessage } : f))
-        );
-         toast.error("विश्लेषण विफल हुआ", {
-           id: toastId,
-           description: `Error processing ${file.name}: ${errorText || errorMessage}`,
-        });
+        throw new Error(`Processing failed: ${response.statusText} (${response.status}) - ${errorText}`);
       }
+      
+      // Backend processed successfully, now save to Supabase
+      toast.dismiss(processingToastId); // Dismiss processing toast
+      setUploadedFiles((prev) =>
+          prev.map((f) => (f.id === fileId ? { ...f, status: "saving" } : f)) // Set saving state
+      );
+
+      const savingToastId = toast.loading("Saving document record...", {
+          description: `Adding ${file.name} to your dashboard.`
+      });
+
+      // --- Supabase Insert ---
+      const { data: { user } } = await supabase.auth.getUser(); // Get current user
+      if (!user) {
+          throw new Error("User not logged in. Cannot save document.");
+      }
+
+      const { error: insertError } = await supabase
+        .from('documents') // Your documents table
+        .insert({
+            user_id: user.id, // Link to current user
+            name: file.name,
+            status: 'Analyzed', // Set initial status (or 'विश्लेषित')
+            // 'created_at' is usually set automatically by Supabase
+        });
+
+      if (insertError) {
+          console.error("Supabase insert error:", insertError);
+          throw new Error(`Failed to save document record: ${insertError.message}`);
+      }
+      // --- End Supabase Insert ---
+
+      // Everything succeeded
+      const resultMessage = "File processed and saved!";
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, status: "complete", result: resultMessage }
+            : f
+        )
+      );
+      toast.success("Document Ready!", {
+         id: savingToastId, // Update the saving toast
+         description: `${file.name} was analyzed and saved.`,
+         action: {
+           label: "Chat Now",
+           onClick: () => handleViewResult(fileId),
+         },
+      });
+
     } catch (error: any) {
-       const errorMessage = `Upload error: ${error.message || "Network error"}`;
+        // Handle errors from either fetch or Supabase insert
+       console.error("Error during upload/save:", error);
+       const errorMessage = error.message || "An unknown error occurred.";
        setUploadedFiles((prev) =>
         prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: errorMessage } : f))
       );
-       toast.error("अपलोड विफल हुआ", {
-         id: toastId,
+       // Dismiss any loading toasts
+       toast.dismiss(processingToastId);
+       // toast.dismiss(savingToastId); // This might not exist if processing failed
+       toast.error("Operation Failed", {
          description: errorMessage,
        });
     }
@@ -119,7 +144,7 @@ export default function UploadPage() {
            setUploadedFiles((prev) =>
              prev.map((f) => (f.id === fileId ? { ...f, status: "processing", progress: 100 } : f))
            );
-           uploadAndProcessFile(file, fileId); // Start actual upload/processing
+           uploadAndProcessFile(file, fileId); // Call the combined function
         } else {
           setUploadedFiles((prev) =>
             prev.map((f) => (f.id === fileId ? { ...f, progress: currentProgress } : f))
@@ -127,8 +152,7 @@ export default function UploadPage() {
         }
       }, 50);
     }
-  }, [uploadAndProcessFile]); // Added dependency
-
+  }, [uploadAndProcessFile]); // Dependency on the combined function
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -170,11 +194,12 @@ export default function UploadPage() {
       <div className="container mx-auto max-w-4xl px-4 py-8">
         {/* Dropzone Card */}
         <Card
-            className={`border-2 border-dashed transition-all duration-300 mb-8 ${
-            isDragOver
+            className={cn( // Use cn here
+                'border-2 border-dashed transition-all duration-300 mb-8',
+                isDragOver
                 ? "border-primary bg-primary/10 scale-[1.03] shadow-inner ring-4 ring-primary/20" // Enhanced drag over styles
                 : "border-border hover:border-primary/50"
-            }`}
+            )}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -252,18 +277,30 @@ export default function UploadPage() {
                   {uploadedFile.status === "processing" && (
                     <div className="flex items-center gap-2 text-sm text-blue-600">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>AI द्वारा दस्तावेज़ का विश्लेषण किया जा रहा है...</span>
+                      <span>AI द्वारा विश्लेषण किया जा रहा है...</span>
                     </div>
+                  )}
+
+                  {/* Saving State */}
+                  {uploadedFile.status === "saving" && (
+                     <div className="flex items-center gap-2 text-sm text-purple-600">
+                       <Loader2 className="w-4 h-4 animate-spin" />
+                       <span>रिकॉर्ड सहेजा जा रहा है...</span>
+                     </div>
                   )}
 
                   {uploadedFile.status === "complete" && (
                     <div className="space-y-2 pt-2">
                       <div className="flex gap-2">
-                        {/* Ensure onClick calls handleViewResult with ID */}
                         <Button size="sm" onClick={() => handleViewResult(uploadedFile.id)}>
-                          परिणाम देखें
+                          चैट करें
                         </Button>
-                         {/* Optional Download Button */}
+                         {/* Optional Download Button Placeholder */}
+                         {/*
+                         <Button variant="outline" size="sm">
+                           डाउनलोड करें
+                         </Button>
+                         */}
                       </div>
                     </div>
                   )}
