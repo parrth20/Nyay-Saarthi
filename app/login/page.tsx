@@ -144,9 +144,11 @@ export default function LoginPage() {
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 p-1" // Added padding for easier click
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 p-1" // Added padding
                             disabled={isLoading}
                             tabIndex={-1}
+                            // *** ARIA-LABEL ADDED HERE ***
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                           >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
@@ -177,7 +179,7 @@ export default function LoginPage() {
                               <label
                                 htmlFor={field.name}
                                 id={`${field.name}-label`} // ID for linking
-                                className="text-sm font-medium leading-none text-gray-600 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                className="text-sm font-medium leading-none text-gray-600 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer" // Added cursor-pointer
                               >
                                 मुझे याद रखें
                               </label>
