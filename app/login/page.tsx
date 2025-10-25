@@ -103,7 +103,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel htmlFor={field.name}>ईमेल पता</FormLabel>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" /> {/* Added pointer-events-none */}
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
                           <FormControl>
                             <Input
                               id={field.name}
@@ -111,7 +111,7 @@ export default function LoginPage() {
                               placeholder="आपका ईमेल दर्ज करें"
                               className="pl-10"
                               disabled={isLoading}
-                              aria-invalid={!!form.formState.errors.email} // Add aria-invalid
+                              aria-invalid={!!form.formState.errors.email}
                               {...field}
                             />
                           </FormControl>
@@ -129,7 +129,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel htmlFor={field.name}>पासवर्ड</FormLabel>
                         <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" /> {/* Added pointer-events-none */}
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
                           <FormControl>
                             <Input
                               id={field.name}
@@ -137,17 +137,16 @@ export default function LoginPage() {
                               placeholder="आपका पासवर्ड दर्ज करें"
                               className="pl-10 pr-10"
                               disabled={isLoading}
-                              aria-invalid={!!form.formState.errors.password} // Add aria-invalid
+                              aria-invalid={!!form.formState.errors.password}
                               {...field}
                             />
                           </FormControl>
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 p-1" // Added padding
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 p-1"
                             disabled={isLoading}
                             tabIndex={-1}
-                            // *** ARIA-LABEL ADDED HERE ***
                             aria-label={showPassword ? "Hide password" : "Show password"}
                           >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -164,22 +163,21 @@ export default function LoginPage() {
                         control={form.control}
                         name="rememberMe"
                         render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-2 space-y-0"> {/* Adjusted spacing */}
+                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                             <FormControl>
                               <Checkbox
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 disabled={isLoading}
                                 id={field.name}
-                                aria-labelledby={`${field.name}-label`} // Link checkbox to label
+                                aria-labelledby={`${field.name}-label`}
                               />
                             </FormControl>
-                            {/* Use a div or span for the label text next to checkbox */}
                             <div className="grid gap-1.5 leading-none">
                               <label
                                 htmlFor={field.name}
-                                id={`${field.name}-label`} // ID for linking
-                                className="text-sm font-medium leading-none text-gray-600 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer" // Added cursor-pointer
+                                id={`${field.name}-label`}
+                                className="text-sm font-medium leading-none text-gray-600 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                               >
                                 मुझे याद रखें
                               </label>
@@ -195,7 +193,7 @@ export default function LoginPage() {
                   {/* Submit Button */}
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white disabled:opacity-70" // Added disabled opacity
+                    className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white disabled:opacity-70"
                     disabled={isLoading || !form.formState.isValid}
                   >
                     {isLoading ? (
@@ -212,8 +210,8 @@ export default function LoginPage() {
                   </Button>
 
                   {/* Link to Register */}
-                  <div className="text-center pt-2"> {/* Added pt-2 */}
-                    <p className="text-sm text-gray-600"> {/* Made text slightly smaller */}
+                  <div className="text-center pt-2">
+                    <p className="text-sm text-gray-600">
                       खाता नहीं है?{" "}
                       <Link href="/register" className="text-blue-600 hover:text-blue-800 font-medium">
                         अभी रजिस्टर करें

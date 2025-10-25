@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, CheckCircle, X, AlertCircle, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Ensure toast is imported
 
 interface UploadedFile {
   file: File;
@@ -49,18 +49,6 @@ export default function UploadPage() {
         body: formData,
         mode: "cors",
       });
-
-      // --- Assuming backend returns some ID or info ---
-      // let backendInfo = {}; // Placeholder
-      // if (response.ok) {
-      //   try {
-      //     backendInfo = await response.json(); // If backend sends JSON on success
-      //   } catch (jsonError) {
-      //     console.error("Failed to parse success response:", jsonError);
-      //   }
-      // }
-      // --- End assumption ---
-
 
       if (response.ok) {
         const resultMessage = "File processed successfully!";
@@ -184,7 +172,7 @@ export default function UploadPage() {
         <Card
             className={`border-2 border-dashed transition-all duration-300 mb-8 ${
             isDragOver
-                ? "border-primary bg-primary/10 scale-[1.03] shadow-inner ring-4 ring-primary/20"
+                ? "border-primary bg-primary/10 scale-[1.03] shadow-inner ring-4 ring-primary/20" // Enhanced drag over styles
                 : "border-border hover:border-primary/50"
             }`}
             onDragOver={handleDragOver}
