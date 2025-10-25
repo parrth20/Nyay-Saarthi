@@ -1,14 +1,23 @@
-fastapi
-uvicorn
-python-multipart
-langchain
-langchain-community
-unstructured[pdf,easyocr] # <-- Update this line
-qdrant-client
-pytesseract
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+langchain==0.2.16
+langchain-community==0.2.16
+langchain-text-splitters==0.2.2
+langchain-google-genai==1.0.7
+sentence-transformers==3.0.1
+qdrant-client==1.9.0
+unstructured==0.15.7
+unstructured[pdf]==0.15.7
+unstructured-inference==0.7.36
+pdfminer.six==20231228
+pillow==10.4.0
+pytesseract==0.3.10
+python-dotenv==1.0.1
+aiofiles==23.2.1
+nltk==3.9.1
 pdf2image
-python-dotenv
-google-generativeai
-langchain-google-genai
-sentence-transformers # <-- Add this for local embeddings
-torch # <-- Add this (required by sentence-transformers)
+pytesseract
+langchain
+pypdf      # or pdfminer.six already present
+langchain-unstructured
