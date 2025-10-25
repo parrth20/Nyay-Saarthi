@@ -9,7 +9,8 @@ import { Header } from "@/components/header";
 // import { Footer } from "@/components/footer";
 import "./globals.css";
 import { CustomCursor } from "@/components/CustomCursor";
-import { Toaster } from "@/components/ui/sonner"; // Import the Toaster (using sonner)
+import { Toaster } from "@/components/ui/sonner";
+import { ActivityTimeoutHandler } from "@/components/ActivityTimeoutHandler"; // Import the handler
 
 export const metadata: Metadata = {
   title: "न्याय-सारथी | Nyay-Saarthi",
@@ -31,11 +32,13 @@ export default function RootLayout({
         <CustomCursor />
         <Header />
         <main className="pt-20">
-          <Suspense fallback={null}>{children}</Suspense>
+          <ActivityTimeoutHandler>
+             <Suspense fallback={null}>{children}</Suspense>
+          </ActivityTimeoutHandler>
         </main>
         {/* <Footer /> */}
         <Analytics />
-        <Toaster richColors position="top-right" /> {/* Add the Toaster component */}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );
