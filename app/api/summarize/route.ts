@@ -15,96 +15,123 @@ export async function POST(req: NextRequest) {
   let uploadedFileName: string | null = null;
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('pdf');
+    const contentType = req.headers.get('content-type') || '';
 
-   
-    if (!file || typeof file === 'string') {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    if (file.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'Only PDF files allowed' }, { status: 400 });
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
-    }
-
-   
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const tempDir = os.tmpdir();
-    tempFilePath = path.join(tempDir, `${Date.now()}-${file.name}`);
-    await fs.writeFile(tempFilePath, buffer);
-
-    console.log('Uploading to Gemini...');
-
-   
-    const uploadResult = await fileManager.uploadFile(tempFilePath, {
-      mimeType: 'application/pdf',
-      displayName: file.name,
-    });
-
-    uploadedFileName = uploadResult.file.name;
-    console.log('Upload successful:', uploadedFileName);
-
-    let fileState = await fileManager.getFile(uploadedFileName);
-    while (fileState.state === 'PROCESSING') {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      fileState = await fileManager.getFile(uploadedFileName);
-    }
-
-    if (fileState.state === 'FAILED') {
-      throw new Error('File processing failed');
-    }
-
-    console.log('Generating summary...');
-
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     
-    const result = await model.generateContent([
-      {
-        fileData: {
-          mimeType: uploadResult.file.mimeType,
-          fileUri: uploadResult.file.uri,
+    if (contentType.includes('application/json')) {
+      const { docName } = await req.json();
+
+      if (!docName) {
+        return NextResponse.json({ error: 'No document name provided' }, { status: 400 });
+      }
+
+      console.log('Fetching summary for stored document:', docName);
+
+      const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+
+      const result = await model.generateContent([
+        { text: `Summarize the document titled "${docName}" in one clear paragraph summarizing its main ideas and purpose.` },
+      ]);
+
+      const summary = result.response.text();
+
+      return NextResponse.json({
+        success: true,
+        summary,
+        fileName: docName,
+      });
+    }
+
+    else if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('pdf');
+
+      if (!file || typeof file === 'string') {
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      }
+
+      if (file.type !== 'application/pdf') {
+        return NextResponse.json({ error: 'Only PDF files allowed' }, { status: 400 });
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const tempDir = os.tmpdir();
+      tempFilePath = path.join(tempDir, `${Date.now()}-${file.name}`);
+      await fs.writeFile(tempFilePath, buffer);
+
+      console.log('Uploading PDF to Gemini...');
+
+      const uploadResult = await fileManager.uploadFile(tempFilePath, {
+        mimeType: 'application/pdf',
+        displayName: file.name,
+      });
+
+      uploadedFileName = uploadResult.file.name;
+
+      
+      let fileState = await fileManager.getFile(uploadedFileName);
+      while (fileState.state === 'PROCESSING') {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        fileState = await fileManager.getFile(uploadedFileName);
+      }
+
+      if (fileState.state === 'FAILED') {
+        throw new Error('File processing failed');
+      }
+
+      console.log('Generating summary from PDF...');
+
+      const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+      const result = await model.generateContent([
+        {
+          fileData: {
+            mimeType: uploadResult.file.mimeType,
+            fileUri: uploadResult.file.uri,
+          },
         },
-      },
-      { 
-        text: `
-You are an expert text analyst and summarization specialist. 
+        {
+          text: `
+You are an expert text analyst and summarization specialist.
 Read and analyze the uploaded document carefully, then produce a single, well-written paragraph 
 that clearly and concisely summarizes the entire content. 
-Focus on the main ideas, key insights, and overall purpose of the document. 
+Focus on the main ideas, key insights, and overall purpose of the document.
 Avoid headings, bullet points, or lists — write it as one cohesive paragraph 
 in a neutral, professional tone with no repetition.
-    `
-      },
-    ]);
+          `,
+        },
+      ]);
 
-    const summary = result.response.text();
+      const summary = result.response.text();
 
-    return NextResponse.json({ 
-      success: true, 
-      summary,
-      fileName: file.name,
-    });
+      return NextResponse.json({
+        success: true,
+        summary,
+        fileName: file.name,
+      });
+    }
 
+ 
+    else {
+      return NextResponse.json(
+        { error: 'Unsupported content type' },
+        { status: 415 }
+      );
+    }
   } catch (error) {
     console.error('Error processing PDF:', error);
-    return NextResponse.json({ 
-      error: 'Failed to process PDF: ' + (error instanceof Error ? error.message : 'Unknown error')
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to process PDF: ' + (error instanceof Error ? error.message : 'Unknown error') },
+      { status: 500 }
+    );
   } finally {
-    
+   
     try {
-      if (tempFilePath) {
-        await fs.unlink(tempFilePath);
-        console.log('Temp file deleted');
-      }
-      if (uploadedFileName) {
-        await fileManager.deleteFile(uploadedFileName);
-        console.log('Gemini file deleted');
-      }
+      if (tempFilePath) await fs.unlink(tempFilePath);
+      if (uploadedFileName) await fileManager.deleteFile(uploadedFileName);
     } catch (cleanupError) {
       console.error('Cleanup error:', cleanupError);
     }
