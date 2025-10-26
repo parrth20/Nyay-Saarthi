@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,11 +10,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon, Clock, CreditCard, CheckCircle, Star, Video, MessageSquare, Shield } from "lucide-react"
+import { createClient } from "@/utils/supabase/client"
 
 export default function ConsultationPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState("")
   const [selectedPlan, setSelectedPlan] = useState("consultation")
+  const [isLoading, setIsLoading] = useState(false)
   const [bookingForm, setBookingForm] = useState({
     name: "",
     email: "",
@@ -25,17 +26,9 @@ export default function ConsultationPage() {
   })
 
   const timeSlots = [
-    "09:00 AM",
-    "10:00 AM",
-    "11:00 AM",
-    "12:00 PM",
-    "02:00 PM",
-    "03:00 PM",
-    "04:00 PM",
-    "05:00 PM",
-    "06:00 PM",
-    "07:00 PM",
-    "08:00 PM",
+    "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+    "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
+    "06:00 PM", "07:00 PM", "08:00 PM",
   ]
 
   const consultationPlans = [
@@ -81,15 +74,55 @@ export default function ConsultationPage() {
     setBookingForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleBooking = (e: React.FormEvent) => {
+  // 🧠 STRIPE INTEGRATION — create checkout session and redirect
+  const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault()
     const selectedPlanData = consultationPlans.find((plan) => plan.id === selectedPlan)
-    console.log("Booking consultation:", {
-      plan: selectedPlanData,
-      date: selectedDate,
-      time: selectedTime,
-      form: bookingForm,
-    })
+    if (!selectedPlanData) return alert("कृपया एक प्लान चुनें")
+
+    setIsLoading(true)
+
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setIsLoading(false)
+        return alert("कृपया पहले लॉगिन करें")
+      }
+
+      const response = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          name: bookingForm.name,
+          email: bookingForm.email,
+          phone: bookingForm.phone,
+          issue: bookingForm.issue,
+          documents: bookingForm.documents,
+          plan: selectedPlanData,
+          amount: selectedPlanData.price,
+          date: selectedDate?.toLocaleDateString("hi-IN"),
+          time: selectedTime,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data?.url) {
+        window.location.href = data.url // 🔗 redirect to Stripe Checkout
+      } else {
+        setIsLoading(false)
+        alert("भुगतान सत्र बनाने में त्रुटि हुई")
+      }
+    } catch (err) {
+      console.error(err)
+      setIsLoading(false)
+      alert("भुगतान सत्र बनाते समय त्रुटि हुई")
+    }
   }
 
   const selectedPlanData = consultationPlans.find((plan) => plan.id === selectedPlan)
@@ -143,7 +176,7 @@ export default function ConsultationPage() {
               </CardContent>
             </Card>
 
-            {/* Date and Time Selection */}
+            {/* Date & Time */}
             {selectedPlan !== "instant" && (
               <Card className="mb-6">
                 <CardHeader>
@@ -254,10 +287,24 @@ export default function ConsultationPage() {
 
                   <Button
                     type="submit"
-                    className={`w-full bg-gradient-to-r ${selectedPlanData?.color} text-white hover:opacity-90`}
+                    disabled={isLoading}
+                    className={`w-full bg-gradient-to-r ${selectedPlanData?.color} text-white hover:opacity-90 transition-all duration-300 relative`}
                     size="lg"
                   >
-                    <CreditCard className="h-5 w-5 mr-2" />₹{selectedPlanData?.price} भुगतान करें और बुक करें
+                    {isLoading ? (
+                      <>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <span className="opacity-0">
+                          <CreditCard className="h-5 w-5 mr-2" />₹{selectedPlanData?.price} भुगतान करें और बुक करें
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-5 w-5 mr-2" />₹{selectedPlanData?.price} भुगतान करें और बुक करें
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>
