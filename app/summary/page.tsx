@@ -65,60 +65,79 @@ function SummaryDisplay() {
     }, [retryDelay]);
 
 
-    // Fetch summary function - wrapped in useCallback
-    const fetchSummary = useCallback(async (language: 'hindi' | 'english' = 'hindi') => {
-        if (!contextFileName) {
-            console.log("Waiting for context file name...");
-            // Don't reset loading if it's already true from initial state
-            // setLoading(true); // Redundant if loading starts true
-            setError('Please provide a document context.'); // More specific error
-            setSummaryHindi(''); setSummaryEnglish('');
-            setLoading(false); // Stop loading if no context
-            return;
-        };
+    // app/summary/page.tsx
+const fetchSummary = useCallback(async (language: 'hindi' | 'english' = 'hindi') => {
+    // ... (existing checks for contextFileName) ...
 
-        setLoading(true); // Explicitly set loading true before fetch
-        setError('');
-        setSummaryHindi(''); // Clear previous summaries before fetching
-        setSummaryEnglish('');
-        setRetryDelay(0); // Reset retry delay
+    setLoading(true);
+    setError('');
+    setSummaryHindi('');
+    setSummaryEnglish('');
+    setRetryDelay(0);
 
-        console.log(`Fetching summary for: ${contextFileName} in ${language}`);
+    console.log(`Fetching summary for: ${contextFileName} in ${language}`);
 
-        try {
-            const res = await fetch('/api/summarize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ docName: contextFileName }),
-            });
+    let response: Response | null = null; // Store response for potential text reading
 
-            const data = await res.json();
+    try {
+        response = await fetch('/api/summarize', { // Assign to outer scope variable
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ docName: contextFileName }),
+        });
 
-            if (!res.ok) {
-                 // Check for rate limit error specifically
-                if (res.status === 429) {
-                    const retryAfterMatch = (data.error || '').match(/retry in (\d+)/i);
-                    const delaySeconds = retryAfterMatch ? parseInt(retryAfterMatch[1], 10) : 60; // Default to 60s if not specified
-                    setRetryDelay(delaySeconds);
-                    throw new Error(`API Rate Limit Exceeded. Please wait ${delaySeconds} seconds.`);
+        if (!response.ok) {
+            let errorMsg = `Summary fetch failed (${response.status})`;
+            let errorDetails = '';
+            let isJsonError = false;
+
+            // Try to parse error as JSON first
+            try {
+                const errorData = await response.json();
+                errorDetails = errorData.error || errorData.details || JSON.stringify(errorData);
+                isJsonError = true;
+                // Handle specific API errors like rate limiting from JSON response
+                if (response.status === 429) {
+                     const retryAfterMatch = (errorDetails || '').match(/retry in (\d+)/i);
+                     const delaySeconds = retryAfterMatch ? parseInt(retryAfterMatch[1], 10) : 60;
+                     setRetryDelay(delaySeconds);
+                     errorMsg = `API Rate Limit Exceeded. Please wait ${delaySeconds} seconds.`;
+                } else {
+                    errorMsg = errorDetails; // Use the error message from JSON
                 }
-                 throw new Error(data.error || `Summary fetch failed (${res.status})`);
+
+            } catch (jsonError) {
+                // If JSON parsing fails, read as text
+                console.warn("Could not parse error response as JSON, reading as text.");
+                try {
+                    errorDetails = await response.text();
+                    errorMsg = `Server returned non-JSON error (${response.status}): ${errorDetails.substring(0, 150)}...`;
+                } catch (textError) {
+                    console.error("Could not read error response as text:", textError);
+                     errorMsg = `Summary fetch failed (${response.status}) and error response could not be read.`;
+                }
             }
-
-            setSummaryHindi(data.summary); // Assume API returns Hindi
-            // Placeholder for English Translation
-            setSummaryEnglish(`(English translation placeholder for: ${data.summary.substring(0, 50)}...)`);
-
-        } catch (err: any) {
-            console.error("Summary fetch error:", err);
-            setError(err.message || 'सारांश लाने में त्रुटि हुई।');
-            setSummaryHindi('');
-            setSummaryEnglish('');
-        } finally {
-            setLoading(false);
+             console.error(`API Error (${response.status}): ${errorDetails}`); // Log details
+             throw new Error(errorMsg); // Throw the constructed error message
         }
-    }, [contextFileName]); // Removed docId, loading, displayLanguage dependencies
 
+        // If response.ok is true, parse the successful JSON response
+        const data = await response.json(); // This should succeed if res.ok is true
+
+        setSummaryHindi(data.summary);
+        setSummaryEnglish(`(English translation placeholder for: ${data.summary.substring(0, 50)}...)`);
+
+    } catch (err: any) {
+        // Catch errors from fetch itself OR from the !response.ok block OR from parsing success JSON
+        console.error("Summary fetch/processing error:", err);
+        setError(err.message || 'सारांश लाने में त्रुटि हुई।');
+        setSummaryHindi('');
+        setSummaryEnglish('');
+    } finally {
+        setLoading(false);
+    }
+}, [contextFileName]); // Keep dependencies minimal
+    
 
     // Trigger initial fetch when contextFileName is set
     useEffect(() => {
