@@ -80,7 +80,7 @@ const fetchSummary = useCallback(async (language: 'hindi' | 'english' = 'hindi')
     let response: Response | null = null; // Store response for potential text reading
 
     try {
-        response = await fetch('/api/summarize', { // Assign to outer scope variable
+        response = await fetch('/api/api', { // Assign to outer scope variable
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ docName: contextFileName }),
