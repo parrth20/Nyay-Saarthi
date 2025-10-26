@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { MessageSquare, Phone, Mail, Clock, Video, CreditCard, CheckCircle, Star, Users, Zap } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function SupportPage() {
   const [contactForm, setContactForm] = useState({
@@ -19,6 +20,7 @@ export default function SupportPage() {
     message: "",
     priority: "medium",
   })
+  const router=useRouter();
 
   const handleInputChange = (field: string, value: string) => {
     setContactForm((prev) => ({ ...prev, [field]: value }))
@@ -160,11 +162,13 @@ export default function SupportPage() {
                       </li>
                     ))}
                   </ul>
-                  <Button className={`w-full bg-gradient-to-r ${plan.color} text-white hover:opacity-90`}>
+                  <Button className={`w-full bg-gradient-to-r ${plan.color} text-white hover:opacity-90`} onClick={()=>router.push('/consultation')}>
                     <CreditCard className="h-4 w-4 mr-2" />
                     अभी बुक करें
-                  </Button>
+                  </Button>  
+                  
                 </CardContent>
+               
               </Card>
             ))}
           </div>
